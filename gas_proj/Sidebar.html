@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 5px;
+        margin: 0;
+        text-align: center;
+        overflow: hidden; /* 全体の不要なスクロールバーを抑制 */
+      }
+      #instruction {
+        font-size: 11px;
+        color: #555;
+        margin: 5px 0;
+      }
+      #status {
+        color: #666;
+        font-size: 11px;
+        margin: 2px 0 5px 0;
+      }
+      #preview-container {
+        width: 100%;
+        /* ウィンドウの高さ(100vh)から上部のテキスト(約40px)を引いた分をプレビュー枠に割り当てる */
+        height: calc(100vh - 40px);
+        border: 1px solid #ccc;
+        box-sizing: border-box;
+      }
+      iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="instruction">シートで行を選択すると画像が表示されます</p>
+    <div id="status">準備完了...</div>
+    <div id="preview-container">
+      <iframe id="preview-frame" src=""></iframe>
+    </div>
+
+    <script>
+      let currentFileId = null;
+      let isFetching = false;
+
+      function updatePreview() {
+        if (isFetching) return; // 前の通信が終わるまで次の通信を保留する
+        isFetching = true;
+
+        // GAS側の getActiveFileId を呼び出して現在の選択行のファイルIDを取得
+        google.script.run
+          .withSuccessHandler(function(fileId) {
+            isFetching = false;
+            if (fileId && fileId !== currentFileId) {
+              currentFileId = fileId;
+              document.getElementById('status').innerText = "画像を表示中...";
+              document.getElementById('preview-frame').src = "https://drive.google.com/file/d/" + fileId + "/preview";
+            } else if (!fileId && currentFileId !== null) {
+              currentFileId = null;
+              document.getElementById('status').innerText = "ファイルが紐付いていない行です";
+              document.getElementById('preview-frame').src = "";
+            }
+          })
+          .withFailureHandler(function(error) {
+            isFetching = false;
+            console.error(error.message);
+          })
+          .getActiveFileId();
+      }
+
+      // 0.5秒に1回、選択行を監視して画像を更新 (ラグを最小化)
+      setInterval(updatePreview, 500);
+      
+      // 初回実行
+      updatePreview();
+    </script>
+  </body>
+</html>

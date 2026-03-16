@@ -1,0 +1,133 @@
+{
+  "requests": [
+    {
+      "addSheet": {
+        "properties": {
+          "title": "設定",
+          "sheetId": 101,
+          "gridProperties": {
+            "rowCount": 100,
+            "columnCount": 10
+          }
+        }
+      }
+    },
+    {
+      "addSheet": {
+        "properties": {
+          "title": "仕訳データ",
+          "sheetId": 102,
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 20
+          }
+        }
+      }
+    },
+    {
+      "addSheet": {
+        "properties": {
+          "title": "システムログ",
+          "sheetId": 103,
+          "hidden": true,
+          "gridProperties": {
+            "rowCount": 1000,
+            "columnCount": 10
+          }
+        }
+      }
+    },
+    {
+      "deleteSheet": {
+        "sheetId": 0
+      }
+    },
+    {
+      "addNamedRange": {
+        "namedRange": {
+          "name": "設定_フォルダURL",
+          "namedRangeId": "nr_folder_url",
+          "range": {
+            "sheetId": 101,
+            "startRowIndex": 1,
+            "endRowIndex": 2,
+            "startColumnIndex": 1,
+            "endColumnIndex": 2
+          }
+        }
+      }
+    },
+    {
+      "addNamedRange": {
+        "namedRange": {
+          "name": "設定_会計ソフト",
+          "namedRangeId": "nr_accounting_software",
+          "range": {
+            "sheetId": 101,
+            "startRowIndex": 2,
+            "endRowIndex": 3,
+            "startColumnIndex": 1,
+            "endColumnIndex": 2
+          }
+        }
+      }
+    },
+    {
+      "addNamedRange": {
+        "namedRange": {
+          "name": "設定_追加プロンプト",
+          "namedRangeId": "nr_extra_prompt",
+          "range": {
+            "sheetId": 101,
+            "startRowIndex": 3,
+            "endRowIndex": 4,
+            "startColumnIndex": 1,
+            "endColumnIndex": 2
+          }
+        }
+      }
+    },
+    {
+      "addNamedRange": {
+        "namedRange": {
+          "name": "設定_勘定科目リスト",
+          "namedRangeId": "nr_accounts_list",
+          "range": {
+            "sheetId": 101,
+            "startRowIndex": 1,
+            "startColumnIndex": 3,
+            "endColumnIndex": 4
+          }
+        }
+      }
+    },
+    {
+      "addNamedRange": {
+        "namedRange": {
+          "name": "設定_補助科目リスト",
+          "namedRangeId": "nr_sub_accounts_list",
+          "range": {
+            "sheetId": 101,
+            "startRowIndex": 1,
+            "startColumnIndex": 4,
+            "endColumnIndex": 5
+          }
+        }
+      }
+    },
+    {
+      "addNamedRange": {
+        "namedRange": {
+          "name": "ログ_処理済みファイルIDs",
+          "namedRangeId": "nr_logged_ids",
+          "range": {
+            "sheetId": 103,
+            "startRowIndex": 1,
+            "startColumnIndex": 0,
+            "endColumnIndex": 1
+          }
+        }
+      }
+    }
+  ]
+}
