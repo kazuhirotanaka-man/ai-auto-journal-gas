@@ -63,19 +63,20 @@ const JournalService = {
         entry.amount || 0,
         entry.description || "",
         warningText,
-        file.getId() // ファイルID (12列目)
+        file.getId(), // ファイルID (12列目)
+        "未確認"       // ステータス (13列目)
       ]);
       bgColors.push(bgColor);
     });
     
     // 複数行を一括で書き込む
     if (rowDataArray.length > 0) {
-      sheet.getRange(targetRowIndex, 1, rowDataArray.length, 12).setValues(rowDataArray);
+      sheet.getRange(targetRowIndex, 1, rowDataArray.length, 13).setValues(rowDataArray);
       
       // 背景色の適用（行ごとに設定）
       bgColors.forEach((color, index) => {
         if (color) {
-          sheet.getRange(targetRowIndex + index, 1, 1, 12).setBackground(color);
+          sheet.getRange(targetRowIndex + index, 1, 1, 13).setBackground(color);
         }
       });
     }
