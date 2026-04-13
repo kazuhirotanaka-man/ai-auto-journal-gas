@@ -82,14 +82,27 @@ function getActiveFileId() {
   if (!activeRange) return null;
 
   const sheet = activeRange.getSheet();
-  if (sheet.getName() !== '仕訳データ') return null;
+  const sheetName = sheet.getName();
+  if (sheetName !== '仕訳データ' && sheetName !== 'freee取引データ') return null;
 
-  const row = activeRange.getRow();
+  let row = activeRange.getRow();
   if (row < 2) return null; // ヘッダー行
 
-  // ファイルIDはL列 (12列目) にあると仮定して取得
-  const fileId = sheet.getRange(row, 12).getValue();
-  return fileId ? String(fileId) : null;
+  if (sheetName === 'freee取引データ') {
+    // 収支(0列目)が空でない行まで遡る
+    while (row >= 2) {
+      const rowData = sheet.getRange(row, 1, 1, 18).getValues()[0];
+      if (rowData[0] !== "") {
+        return rowData[17] ? String(rowData[17]) : null;
+      }
+      row--;
+    }
+    return null;
+  } else {
+    // 弥生用：ファイルIDはL列 (12列目) にある
+    const fileId = sheet.getRange(row, 12).getValue();
+    return fileId ? String(fileId) : null;
+  }
 }
 
 /**
@@ -195,7 +208,7 @@ function getPopupData(rowIndex) {
 
   // 行のデータを取得
   const rowData = sheet.getRange(targetRow, 1, 1, dataColumns).getValues()[0];
-  if (!rowData[0] && !rowData[fileIdColIndex]) return null; // データが空
+  if (rowData.join("").length === 0) return null; // データが空
 
   if (isFreee) {
     // 1列目（収支）が空白の場合、空白でなくなるまで上方向に遡って取引の開始行（Head）を見つける
