@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 15px; line-height: 1.6; color: #333; }
+        h3 { color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 5px; }
+        p { font-size: 14px; }
+        .step { margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; }
+        .step-title { font-weight: bold; color: #1a73e8; }
+        input[type="text"] { width: calc(100% - 22px); padding: 10px; margin: 5px 0 10px 0; border: 1px solid #ccc; border-radius: 4px; }
+        button, a.button-link {
+            background-color: #1a73e8;
+            color: white;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box; /* はみ出し防止 */
+        }
+        button:hover, a.button-link:hover { opacity: 0.9; }
+        .close-button { background-color: #6c757d; }
+        .status { padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; font-weight: bold; }
+        .status-ok { background-color: #e6f4ea; color: #155724; }
+        .status-ng { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h3>freee 認証</h3>
+
+    <div id="status"></div>
+
+    <div id="auth-flow">
+        <div class="step">
+            <p class="step-title">ステップ1: 認証ページを開く</p>
+            <p>下のボタンをクリックしてfreeeのサイトを開き、連携を許可してください。</p>
+            <button id="auth-url-btn" disabled>認証URLを準備中...</button>
+        </div>
+
+        <div class="step">
+            <p class="step-title">ステップ2: 認可コードを貼り付け</p>
+            <p>freeeの画面に表示された「認可コード」を下に貼り付けて、認証を完了してください。</p>
+            <input type="text" id="auth-code" placeholder="ここに認可コードを貼り付け">
+            <button onclick="submitAuthCode()">認証を完了する</button>
+        </div>
+    </div>
+
+    <script>
+        // ページ読み込み時に認証状態とURLを取得
+        document.addEventListener('DOMContentLoaded', function() {
+            google.script.run.withSuccessHandler(updateUi).getSidebarState();
+        });
+
+        function updateUi(state) {
+            const statusDiv = document.getElementById('status');
+            const authFlowDiv = document.getElementById('auth-flow');
+            
+            if (state.isAuthorized) {
+                statusDiv.innerHTML = '<div class="status status-ok">認証済みです。<br>このサイドバーは閉じて構いません。<br><button class="close-button" onclick="google.script.host.close()">サイドバーを閉じる</button></div>';
+                authFlowDiv.style.display = 'none';
+            } else {
+                statusDiv.innerHTML = '<div class="status status-ng">未認証です。<br>下のステップに従って認証を行ってください。</div>';
+                
+                const authBtn = document.getElementById('auth-url-btn');
+                authBtn.onclick = () => window.open(state.authUrl, '_blank');
+                authBtn.textContent = 'freeeで認証する';
+                authBtn.disabled = false;
+                // aタグのスタイルをbuttonに適用
+                authBtn.className = 'button-link';
+
+                authFlowDiv.style.display = 'block';
+            }
+        }
+
+        function submitAuthCode() {
+            const code = document.getElementById('auth-code').value.trim();
+            if (!code) {
+                alert('認可コードを入力してください。');
+                return;
+            }
+            // ボタンを無効化してフィードバック
+            const button = event.target;
+            button.textContent = '処理中...';
+            button.disabled = true;
+
+            google.script.run.withSuccessHandler(function(success) {
+                if (success) {
+                    // 成功したら現在のサイドバーを閉じて、事業所選択サイドバーを開く
+                    google.script.run.showCompanySelectorSidebar();
+                    google.script.host.close();
+                } else {
+                    alert('認証に失敗しました。認可コードが正しいか確認してください。');
+                    button.textContent = '認証を完了する';
+                    button.disabled = false;
+                }
+            }).exchangeCode(code);
+        }
+    </script>
+</body>
+</html>

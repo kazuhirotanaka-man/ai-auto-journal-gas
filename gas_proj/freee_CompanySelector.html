@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 15px; line-height: 1.6; color: #333; }
+        h3 { color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 5px; }
+        p { font-size: 14px; }
+        select { width: 100%; padding: 8px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #ccc; }
+        button {
+            background-color: #1a73e8; color: white; padding: 10px 15px; border: none;
+            cursor: pointer; width: 100%; border-radius: 4px; font-size: 14px; box-sizing: border-box;
+        }
+        button:hover { opacity: 0.9; }
+        .status { padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; font-weight: bold; }
+        .status-ok { background-color: #e6f4ea; color: #155724; }
+        .status-ng { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h3>操作事業所の選択</h3>
+
+    <div id="status">読み込み中...</div>
+
+    <p>操作対象とする事業所を選択してください。</p>
+    <select id="company-list"></select>
+    <button onclick="saveSelection()">この事業所を選択する</button>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            google.script.run.withSuccessHandler(populateForm).getCompanySelectorInfo();
+        });
+
+        function populateForm(data) {
+            const select = document.getElementById('company-list');
+            const statusDiv = document.getElementById('status');
+            select.innerHTML = ''; // Clear previous options
+
+            if (data.error) {
+                statusDiv.innerHTML = `<div class="status status-ng">${data.error}</div>`;
+                return;
+            }
+
+            data.companies.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company.id;
+                option.textContent = company.display_name;
+                if (company.id == data.selectedCompanyId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            if (data.selectedCompanyName) {
+                statusDiv.innerHTML = `<div class="status status-ok">現在選択中の事業所:<br><strong>${data.selectedCompanyName}</strong></div>`;
+            } else {
+                statusDiv.innerHTML = `<div class="status status-ng">事業所が選択されていません。</div>`;
+            }
+        }
+
+        function saveSelection() {
+            const select = document.getElementById('company-list');
+            const selectedId = select.value;
+            const button = event.target;
+            button.textContent = '保存中...';
+            button.disabled = true;
+
+            google.script.run.withSuccessHandler(() => {
+                // 再度情報を読み込んで表示を更新
+                google.script.run.withSuccessHandler(populateForm).getCompanySelectorInfo();
+                button.textContent = 'この事業所を選択する';
+                button.disabled = false;
+            }).setSelectedCompany(selectedId);
+        }
+    </script>
+</body>
+</html>

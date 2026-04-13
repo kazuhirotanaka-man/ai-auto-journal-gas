@@ -12,6 +12,20 @@ function onOpen() {
     .addSeparator()
     .addItem('💾 会計ソフト形式でエクスポート', 'exportCsvHandler')
     .addToUi();
+
+  // freee連携メニュー
+  ui.createMenu('freee連携')
+    .addItem('認証', 'showFreeeSidebar')
+    .addItem('操作事業所の選択', 'showCompanySelectorSidebar')
+    .addSeparator()
+    .addItem('マスタ取得', 'fetchFreeeMasters')
+    .addSeparator()
+    .addItem('トークン自動更新設定', 'toggleAutoRefreshToken')
+    .addSeparator()
+    .addItem('【デモ】取引の登録〜削除', 'runDealLifecycleSample')
+    .addSeparator()
+    .addItem('連携を解除', 'reset')
+    .addToUi();
 }
 
 function exportCsvHandler() {
