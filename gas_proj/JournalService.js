@@ -42,11 +42,11 @@ const JournalService = {
       ]);
     }
     
-    // システム上の最終行を取得（17列目: ファイルID列 を基準に検索）
-    const columnQ = sheet.getRange("Q:Q").getValues();
+    // システム上の最終行を取得（特定の列に依存せず行全体を見て判定する）
+    const data = sheet.getDataRange().getValues();
     let lastRow = 1;
-    for (let i = columnQ.length - 1; i >= 0; i--) {
-      if (columnQ[i][0] !== "") {
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (data[i].join("").length > 0) {
         lastRow = i + 1;
         break;
       }
@@ -116,6 +116,12 @@ const JournalService = {
       let displayRowWallet = wallet;
       let displayRowRegistrationNumber = registrationNumber;
 
+      let displayRowGuessedDocType = entry.guessedDocumentType || (!isTarget ? "" : "領収書・レシート");
+      let displayRowGuessedPaymentMethod = entry.guessedPaymentMethod || (!isTarget ? "" : "現金");
+      let displayRowWarningText = warningText;
+      let displayRowFileId = file.getId();
+      let displayRowStatus = "未確認";
+
       if (prevGroupKey === currentGroupKey) {
         // 同一取引の2行目以降は前項目の6項目を空表示にする
         displayRowIncomeExpense = "";
@@ -125,6 +131,13 @@ const JournalService = {
         displayRowPaymentDate = "";
         displayRowWallet = "";
         displayRowRegistrationNumber = "";
+
+        // 複数明細の場合は取引単位の項目も空にする
+        displayRowGuessedDocType = "";
+        displayRowGuessedPaymentMethod = "";
+        displayRowWarningText = "";
+        displayRowFileId = "";
+        displayRowStatus = "";
       } else {
         prevGroupKey = currentGroupKey;
       }
@@ -144,11 +157,11 @@ const JournalService = {
         department,              // 12 (L)
         memoTag,                 // 13 (M)
         entry.remarks || "",     // 14 (N)
-        entry.guessedDocumentType || (!isTarget ? "" : "領収書・レシート"), // 15
-        entry.guessedPaymentMethod || (!isTarget ? "" : "現金"),          // 16
-        warningText,             // 17 AI解析精度
-        file.getId(),            // 18 ファイルID
-        "未確認"                  // 19 ステータス
+        displayRowGuessedDocType, // 15
+        displayRowGuessedPaymentMethod, // 16
+        displayRowWarningText,   // 17 AI解析精度
+        displayRowFileId,        // 18 ファイルID
+        displayRowStatus         // 19 ステータス
       ]);
       bgColors.push(bgColor);
     });
@@ -172,11 +185,11 @@ const JournalService = {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName("仕訳データ");
     
-    // システム上の最終行を取得（12列目: ファイルID列 を基準に検索）
-    const columnL = sheet.getRange("L:L").getValues();
+    // システム上の最終行を取得（特定の列に依存せず行全体を見て判定する）
+    const data = sheet.getDataRange().getValues();
     let lastRow = 1;
-    for (let i = columnL.length - 1; i >= 0; i--) {
-      if (columnL[i][0] !== "") {
+    for (let i = data.length - 1; i >= 0; i--) {
+      if (data[i].join("").length > 0) {
         lastRow = i + 1;
         break;
       }

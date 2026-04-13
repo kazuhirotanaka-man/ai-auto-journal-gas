@@ -222,11 +222,11 @@ function getPopupData(rowIndex) {
       const rowVars = sheet.getRange(currentRow, 1, 1, dataColumns).getValues()[0];
       const rFileId = rowVars[17] ? String(rowVars[17]) : null;
       
-      // 最初（Head行）は無条件で追加。2行目以降は fileIdが同じ ＆ 収支(rowVars[0])が空白 なら同じ取引とみなす。
-      if (currentRow === targetRow || (rFileId === fileId && rowVars[0] === "")) {
+      // 最初（Head行）は無条件で追加。2行目以降は 収支(rowVars[0])が空白 なら同じ取引の明細とみなす。
+      if (currentRow === targetRow || rowVars[0] === "") {
         detailsData.push(rowVars);
       } else {
-        break; // 別の取引が始まったか、別のファイルになった場合は終了
+        break; // 別の取引が始まったら終了
       }
       currentRow++;
     }
@@ -372,8 +372,14 @@ function updateAndProcessNext(rowIndex, updateData, action) {
           currentValues[4] = updateData.transaction.paymentStatus;
           currentValues[5] = updateData.transaction.paymentDate;
           currentValues[6] = updateData.transaction.wallet;
+
+          if (action === 'exclude') {
+            currentValues[18] = '対象外';
+          } else {
+            currentValues[18] = updateData.status || '確認済';
+          }
         } else {
-          // 明細行は取引基本項目を空白にする
+          // 明細行は取引基本項目および推測系・状態管理項目を空白にする
           currentValues[0] = "";
           currentValues[1] = "";
           currentValues[2] = "";
@@ -381,6 +387,12 @@ function updateAndProcessNext(rowIndex, updateData, action) {
           currentValues[4] = "";
           currentValues[5] = "";
           currentValues[6] = "";
+
+          currentValues[14] = ""; // 推測証票種別
+          currentValues[15] = ""; // 推測決済方法
+          currentValues[16] = ""; // AI解析精度
+          currentValues[17] = ""; // ファイルID
+          currentValues[18] = ""; // ステータス
         }
 
         const detail = updateData.details[i];
@@ -391,12 +403,6 @@ function updateAndProcessNext(rowIndex, updateData, action) {
         currentValues[11] = detail.department;
         currentValues[12] = detail.memoTag;
         currentValues[13] = detail.description;
-
-        if (action === 'exclude') {
-          currentValues[18] = '対象外';
-        } else {
-          currentValues[18] = updateData.status || '確認済';
-        }
       });
       range.setValues(values);
       if (action === 'exclude') {
@@ -489,8 +495,8 @@ function deleteFreeeDetailRow(rowIndex, detailIndex) {
       const nextRowRange = sheet.getRange(targetRow + 1, 1, 1, 19);
       const nextRowData = nextRowRange.getValues()[0];
       
-      // 次の行が同じ取引の明細行である場合（fileIdが同じで、収支が空の場合）
-      if (nextRowData[17] === fileId && nextRowData[0] === "") {
+      // 次の行が同じ取引の明細行である場合（収支が空の場合）
+      if (nextRowData[0] === "") {
         // 先頭行の情報を引き継ぐ
         nextRowData[0] = currentRowData[0]; // 収支
         nextRowData[1] = currentRowData[1]; // 発生日
