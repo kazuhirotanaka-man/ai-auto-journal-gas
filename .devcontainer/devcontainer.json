@@ -1,0 +1,24 @@
+{
+  "name": "Google Apps Script (clasp) Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:20-bookworm",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+
+  "postCreateCommand": "npm install -g @google/clasp typescript @types/google-apps-script",
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": true
+      },
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+
+  "remoteUser": "node"
+}
