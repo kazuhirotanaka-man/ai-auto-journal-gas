@@ -532,6 +532,16 @@
         if (action === 'save' && updateData.status === '未確認') {
           updateData.status = '確認済';
         }
+      } else if (action === 'justNext') {
+        // スキップ時でもコード側で次の取引へジャンプするための行数を伝える
+        const numDetails = document.querySelectorAll('.detail-block').length;
+        // 空のオブジェクトを配列の要素数だけ入れることで、送受信時のシリアライズエラーを防止
+        let dummyDetails = [];
+        for (let i = 0; i < (numDetails || 1); i++) dummyDetails.push({});
+        
+        updateData = {
+          details: dummyDetails
+        };
       }
 
       google.script.run
