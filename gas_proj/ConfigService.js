@@ -41,10 +41,28 @@ const ConfigService = {
   },
 
   /**
+   * freeeマスタシートからB列（2列目）のリストを取得する
+   * @param {string} sheetName
+   * @returns {string[]}
+   */
+  getFreeeMasterList: function (sheetName) {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return [];
+    
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return [];
+    
+    // B列 (列番号2) のデータを取得
+    const values = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+    return values.flat().filter(v => v !== "" && String(v).trim() !== "");
+  },
+
+  /**
    * 現在の全ての設定オブジェクトを取得する
    */
   getAllConfig: function () {
-    return {
+    const config = {
       companyName: this.getValue("設定_自社名"),
       industryType: this.getValue("設定_業種"),
       businessDetails: this.getValue("設定_事業内容"),
@@ -56,6 +74,18 @@ const ConfigService = {
       accountsAndSubAccountsList: this.getList("設定_科目・補助科目"),
       taxCategoryList: this.getList("設定_税区分リスト")
     };
+
+    if (config.accountingSoftware === "freee会計") {
+      config.freeeAccountsList = this.getFreeeMasterList("マスタfreee勘定科目");
+      config.freeeTaxCategoryList = this.getFreeeMasterList("マスタfreee税区分");
+      config.freeeWalletsList = this.getFreeeMasterList("マスタfreee口座");
+      config.freeePartnersList = this.getFreeeMasterList("マスタfreee取引先");
+      config.freeeItemsList = this.getFreeeMasterList("マスタfreee品目");
+      config.freeeDepartmentsList = this.getFreeeMasterList("マスタfreee部門");
+      config.freeeTagsList = this.getFreeeMasterList("マスタfreeeメモタグ");
+    }
+
+    return config;
   },
 
   /**

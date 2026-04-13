@@ -9,9 +9,11 @@ const ExportService = {
   exportToCsvWithStatuses: function(statuses) {
     const config = ConfigService.getAllConfig();
     const software = config.accountingSoftware || "弥生会計";
+    const isFreee = software === "freee会計";
     
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName("仕訳データ");
+    const sheetName = isFreee ? "freee取引データ" : "仕訳データ";
+    const sheet = ss.getSheetByName(sheetName);
     
     // データのある範囲を取得（ヘッダーを除く）
     const lastRow = sheet.getLastRow();
@@ -19,15 +21,18 @@ const ExportService = {
       return { error: "エクスポート対象のデータがありません。" };
     }
     
-    // A2からM列(13列目)までのデータを取得
-    const dataRange = sheet.getRange(2, 1, lastRow - 1, 13);
+    const dataColumns = isFreee ? 18 : 13;
+    const statusColIndex = isFreee ? 17 : 12; // 0-indexed
+    
+    // データを取得
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, dataColumns);
     const dataList = dataRange.getValues();
     
     let targetRows = [];
     let rowIndicesToUpdate = [];
     
     dataList.forEach((row, index) => {
-      const status = row[12]; // M列
+      const status = row[statusColIndex];
       if (statuses.includes(status)) {
         targetRows.push(row);
         rowIndicesToUpdate.push(index + 2); // データ行は2行目から
@@ -42,18 +47,20 @@ const ExportService = {
     
     if (software === "弥生会計") {
       csvData = this.buildYayoiCsv(targetRows);
+    } else if (software === "freee会計") {
+      return { error: `freee会計の場合は、CSVエクスポート機能ではなく専用のAPIを利用した「取引登録」機能を後日利用する予定です。（現在はエクスポートを行いません）` };
     } else {
       return { error: `会計ソフト「${software}」の出力形式は現在未対応です。` };
     }
     
     // CSVファイルをDriveのルートに作成
     const fileName = `仕訳エクスポート_${software}_${Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyyMMdd_HHmmss")}.csv`;
-    const blob = Utilities.newBlob("", "text/csv", fileName).setDataFromString(csvData, "Shift_JIS"); // 弥生会計は一般的にShift-JISが安全
+    const blob = Utilities.newBlob("", "text/csv", fileName).setDataFromString(csvData, "Shift_JIS"); // 汎用的にShift-JIS
     const file = DriveApp.createFile(blob);
     
     // 出力対象となった行のステータスを一括で「ダウンロード済み」に変更
     rowIndicesToUpdate.forEach(rowIdx => {
-      sheet.getRange(rowIdx, 13).setValue("ダウンロード済み");
+      sheet.getRange(rowIdx, statusColIndex + 1).setValue("ダウンロード済み");
     });
 
     // ダイアログを表示してダウンロードリンクを提供

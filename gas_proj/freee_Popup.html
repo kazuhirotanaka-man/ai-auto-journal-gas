@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: #f9f9f9;
+      color: #333;
+    }
+
+    #preview-container {
+      flex: 1;
+      border-right: 1px solid #ccc;
+      background: #fff;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    #form-container {
+      width: 420px;
+      box-sizing: border-box;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      padding-bottom: 10px;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      color: #555;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .row-flex {
+      display: flex;
+      gap: 10px;
+    }
+
+    .row-flex>div {
+      flex: 1;
+    }
+
+    .buttons {
+      padding: 15px 20px;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      z-index: 10;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px 4px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+    }
+
+    .btn-secondary .spinner {
+      border-color: rgba(0, 0, 0, 0.1);
+      border-top-color: #333;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .btn-primary {
+      background: #1a73e8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #1557b0;
+    }
+
+    .btn-secondary {
+      background: #f1f3f4;
+      color: #3c4043;
+      border: 1px solid #dadce0;
+    }
+
+    .btn-secondary:hover {
+      background: #e8eaed;
+    }
+
+    .btn-danger {
+      background: #ea4335;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c5221f;
+    }
+
+    .header-info-row {
+      display: block;
+      margin-bottom: 15px;
+      flex-shrink: 0;
+    }
+
+    #status-msg {
+      font-size: 14px;
+      color: #1a73e8;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    #warning-text {
+      color: #ea4335;
+      font-weight: bold;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .box-area {
+      border: 1px solid #e0e0e0;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      background: #fafafa;
+    }
+
+    #transaction-info-box {
+      background: #e8f0fe;
+      border: 1px solid #d2e3fc;
+    }
+
+    .box-label {
+      font-size: 13px;
+      font-weight: bold;
+      color: #1a73e8;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="preview-container">
+    <iframe id="preview-frame" src=""></iframe>
+  </div>
+
+  <div id="form-container">
+    <div id="scroll-area">
+      <div class="header-info-row">
+        <div id="status-msg">読込中...</div>
+        <div id="warning-text"></div>
+      </div>
+
+      <input type="hidden" id="ui-status" value="未確認" />
+
+      <div class="box-area" id="transaction-info-box">
+        <div class="box-label">取引情報</div>
+        <div class="form-group row-flex">
+          <div>
+            <label>収支</label>
+            <select id="ui-incomeExpense">
+              <option value="収入">収入</option>
+              <option value="支出">支出</option>
+            </select>
+          </div>
+          <div>
+            <label>発生日</label>
+            <input type="date" id="ui-date" onfocus="try { this.showPicker(); } catch(e) {}" />
+          </div>
+          <div>
+            <!-- 第一行の3列目の空き -->
+          </div>
+        </div>
+
+        <div class="form-group row-flex">
+          <div>
+            <label>取引先</label>
+            <select id="ui-partner"></select>
+          </div>
+          <div>
+            <label>登録番号</label>
+            <input type="text" id="ui-registrationNumber" placeholder="T+13文字" />
+          </div>
+          <div>
+            <!-- レイアウト調整用の空要素 -->
+          </div>
+        </div>
+
+        <div class="form-group row-flex">
+          <div>
+            <label>決済ステータス</label>
+            <select id="ui-paymentStatus" onchange="togglePaymentFields()">
+              <option value="未決済">未決済</option>
+              <option value="決済済">決済済</option>
+            </select>
+          </div>
+          <div>
+            <label>決済期日</label>
+            <input type="date" id="ui-paymentDate" onfocus="try { this.showPicker(); } catch(e) {}" />
+          </div>
+          <div>
+            <label>決済口座</label>
+            <select id="ui-wallet"></select>
+          </div>
+        </div>
+      </div>
+
+      <div id="details-container"></div>
+    </div>
+
+    <div class="buttons">
+      <button id="btn-back" class="btn-secondary" onclick="doAction('back', this)">◀前に戻る</button>
+      <button id="btn-skip" class="btn-secondary" onclick="doAction('justNext', this)">スキップ▶</button>
+      <button id="btn-save" class="btn-primary" onclick="doAction('save', this)">確認済にして次へ▶</button>
+      <button id="btn-exclude" class="btn-secondary" onclick="doAction('exclude', this)">対象外にして次へ▶</button>
+    </div>
+  </div>
+
+  <script>
+    let currentRowIndex = null;
+    let isProcessing = false;
+
+    function resetButtons() {
+      document.querySelectorAll('.buttons button').forEach(b => b.disabled = false);
+      const btnSave = document.getElementById('btn-save');
+      const btnExclude = document.getElementById('btn-exclude');
+      const btnBack = document.getElementById('btn-back');
+      const btnSkip = document.getElementById('btn-skip');
+      if (btnSave) btnSave.innerText = '確認済にして次へ▶';
+      if (btnExclude) btnExclude.innerText = '対象外にして次へ▶';
+      if (btnBack) btnBack.innerText = '◀前に戻る';
+      if (btnSkip) btnSkip.innerText = 'スキップ▶';
+    }
+
+    function togglePaymentFields() {
+      const status = document.getElementById('ui-paymentStatus').value;
+      const paymentDate = document.getElementById('ui-paymentDate');
+      const wallet = document.getElementById('ui-wallet');
+
+      if (status === '未決済') {
+        wallet.value = '';
+        wallet.disabled = true;
+        paymentDate.disabled = false;
+      } else if (status === '決済済') {
+        paymentDate.value = '';
+        paymentDate.disabled = true;
+        wallet.disabled = false;
+      } else {
+        wallet.disabled = false;
+        paymentDate.disabled = false;
+      }
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status-msg').innerText = msg;
+    }
+
+    function populateSelect(selectId, list, currentValue, showNoValueOption = true) {
+      const sel = document.getElementById(selectId);
+      if (sel.tagName !== 'SELECT') return;
+      
+      // if it has predefined options (like incomeExpense), just set value
+      if (selectId === 'ui-incomeExpense' || selectId === 'ui-paymentStatus') {
+        sel.value = currentValue || '';
+        if (sel.value === '' && sel.options.length > 0) sel.selectedIndex = 0; // fallback
+        return;
+      }
+
+      sel.innerHTML = showNoValueOption ? '<option value=""></option>' : '';
+      let found = false;
+
+      if (list && list.length > 0) {
+        list.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item;
+          opt.text = item;
+          if (item === currentValue) {
+            opt.selected = true;
+            found = true;
+          }
+          sel.appendChild(opt);
+        });
+      }
+
+      if (currentValue && !found) {
+        const opt = document.createElement('option');
+        opt.value = currentValue;
+        opt.text = currentValue + " (未登録)";
+        opt.selected = true;
+        sel.appendChild(opt);
+      }
+    }
+
+    function onDataLoaded(res) {
+      resetButtons();
+      if (!res) {
+        setStatus("データが見つかりません。最後の行に到達したか、シートにデータがありません。");
+        document.getElementById('preview-frame').src = "";
+        return;
+      }
+
+      currentRowIndex = res.startRowIndex; // 取引の先頭行
+      const t = res.data.transaction;
+      const details = res.data.details;
+      const currentStatus = t.status || '未確認';
+
+      setStatus(currentRowIndex + "行目 からの取引を確認中 （ステータス: " + currentStatus + "）");
+
+      if (res.fileId) {
+        document.getElementById('preview-frame').src = "https://drive.google.com/file/d/" + res.fileId + "/preview";
+      } else {
+        document.getElementById('preview-frame').src = "";
+      }
+
+      let aiGuessedInfo = [];
+      if (t.guessedDocumentType) aiGuessedInfo.push(t.guessedDocumentType);
+      if (t.guessedPaymentMethod) aiGuessedInfo.push(t.guessedPaymentMethod);
+      const aiGuessText = aiGuessedInfo.length > 0 ? " [" + aiGuessedInfo.join(", ") + "]" : "";
+
+      document.getElementById('warning-text').innerText = (t.warningText ? "AI推測確度: " + t.warningText : "") + aiGuessText;
+
+      document.getElementById('ui-status').value = currentStatus;
+      
+      populateSelect('ui-incomeExpense', null, t.incomeExpense);
+      document.getElementById('ui-date').value = t.date || '';
+      
+      populateSelect('ui-partner', res.freeePartnersList, t.partner);
+      document.getElementById('ui-registrationNumber').value = t.registrationNumber || '';
+      
+      populateSelect('ui-paymentStatus', null, t.paymentStatus);
+      document.getElementById('ui-paymentDate').value = t.paymentDate || '';
+      populateSelect('ui-wallet', res.freeeWalletsList, t.wallet);
+      
+      togglePaymentFields(); // 状態に応じたフィールド非活性化の初期適用
+
+      const container = document.getElementById('details-container');
+      container.innerHTML = '';
+
+      details.forEach((d, idx) => {
+        const idSuffix = idx + 1;
+        const html = `
+          <div class="box-area detail-block" data-index="${idx}">
+            <div class="box-label row-flex" style="justify-content: space-between; align-items: center;">
+              <div>明細情報 ${idSuffix}</div>
+              <button class="btn-danger" style="flex: none; padding: 4px 8px; font-size: 11px;" onclick="doDeleteDetail(${idx}, this)">🗑 削除</button>
+            </div>
+            <div class="form-group row-flex">
+              <div>
+                <label>勘定科目</label>
+                <select id="ui-accountItem-${idx}"></select>
+              </div>
+              <div>
+                <label>金額</label>
+                <input type="number" id="ui-amount-${idx}" value="${d.amount !== undefined ? d.amount : ''}" />
+              </div>
+              <div>
+                <label>税区分</label>
+                <select id="ui-taxCategory-${idx}"></select>
+              </div>
+            </div>
+            <div class="form-group row-flex">
+              <div>
+                <label>品目</label>
+                <select id="ui-item-${idx}"></select>
+              </div>
+              <div>
+                <label>部門</label>
+                <select id="ui-department-${idx}"></select>
+              </div>
+              <div>
+                <label>メモタグ</label>
+                <select id="ui-memoTag-${idx}"></select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>備考</label>
+              <textarea id="ui-description-${idx}" rows="2">${d.description || ''}</textarea>
+            </div>
+          </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+
+        populateSelect(`ui-accountItem-${idx}`, res.freeeAccountsList, d.accountItem);
+        populateSelect(`ui-taxCategory-${idx}`, res.freeeTaxCategoryList, d.taxCategory);
+        populateSelect(`ui-item-${idx}`, res.freeeItemsList, d.item);
+        populateSelect(`ui-department-${idx}`, res.freeeDepartmentsList, d.department);
+        populateSelect(`ui-memoTag-${idx}`, res.freeeTagsList, d.memoTag);
+      });
+    }
+
+    function loadData(rowIndex) {
+      setStatus("読込中...");
+      document.querySelectorAll('.buttons button, .btn-danger').forEach(b => b.disabled = true);
+      google.script.run
+        .withSuccessHandler(function (res) {
+          isProcessing = false;
+          onDataLoaded(res);
+        })
+        .withFailureHandler(function (err) {
+          isProcessing = false;
+          setStatus("エラー: " + err.message);
+          resetButtons();
+        })
+        .getPopupData(rowIndex);
+    }
+
+    function doDeleteDetail(idx, btn) {
+      if (isProcessing) return;
+      if (!confirm(`明細情報 ${idx + 1} を削除しますか？\n（※1行しかない場合は、取引ごと削除されます）`)) {
+        return;
+      }
+      
+      isProcessing = true;
+      setStatus(`明細情報 ${idx + 1} をシートから削除中...`);
+      document.querySelectorAll('.buttons button, .btn-danger').forEach(b => b.disabled = true);
+      btn.innerHTML = '<div class="spinner"></div>';
+      
+      google.script.run
+        .withSuccessHandler(function (res) {
+          onDataLoaded(res);
+          isProcessing = false;
+        })
+        .withFailureHandler(function (err) {
+          setStatus("エラー: " + err.message);
+          isProcessing = false;
+          resetButtons();
+          btn.innerHTML = '🗑 削除';
+          document.querySelectorAll('.btn-danger').forEach(b => b.disabled = false);
+        })
+        .deleteFreeeDetailRow(currentRowIndex, idx);
+    }
+
+    function doAction(action, btnTarget) {
+      if (isProcessing) return;
+      if (action === 'back' && !currentRowIndex) return;
+
+      isProcessing = true;
+      setStatus("処理中...");
+
+      document.querySelectorAll('.buttons button').forEach(b => b.disabled = true);
+      if (btnTarget) {
+        btnTarget.innerHTML = '<div class="spinner"></div>';
+      }
+
+      let updateData = null;
+      if (action === 'save' || action === 'exclude') {
+        let detailsArr = [];
+        document.querySelectorAll('.detail-block').forEach((block) => {
+          let idx = block.getAttribute('data-index');
+          detailsArr.push({
+            accountItem: document.getElementById(`ui-accountItem-${idx}`).value,
+            amount: document.getElementById(`ui-amount-${idx}`).value,
+            taxCategory: document.getElementById(`ui-taxCategory-${idx}`).value,
+            item: document.getElementById(`ui-item-${idx}`).value,
+            department: document.getElementById(`ui-department-${idx}`).value,
+            memoTag: document.getElementById(`ui-memoTag-${idx}`).value,
+            description: document.getElementById(`ui-description-${idx}`).value
+          });
+        });
+
+        updateData = {
+          status: document.getElementById('ui-status').value,
+          transaction: {
+            incomeExpense: document.getElementById('ui-incomeExpense').value,
+            date: document.getElementById('ui-date').value,
+            partner: document.getElementById('ui-partner').value,
+            registrationNumber: document.getElementById('ui-registrationNumber').value,
+            paymentStatus: document.getElementById('ui-paymentStatus').value,
+            paymentDate: document.getElementById('ui-paymentDate').value,
+            wallet: document.getElementById('ui-wallet').value,
+          },
+          details: detailsArr
+        };
+
+        if (action === 'save' && updateData.status === '未確認') {
+          updateData.status = '確認済';
+        }
+      }
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          onDataLoaded(res);
+          isProcessing = false;
+        })
+        .withFailureHandler(function (err) {
+          setStatus("エラー: " + err.message);
+          isProcessing = false;
+          resetButtons();
+        })
+        .updateAndProcessNext(currentRowIndex, updateData, action);
+    }
+
+    window.onload = function () {
+      loadData(null);
+    };
+  </script>
+</body>
+
+</html>

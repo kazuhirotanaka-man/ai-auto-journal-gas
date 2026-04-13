@@ -50,6 +50,7 @@ function fetchFreeeMasters() {
     const accountItemsRes = callFreeeApi('get', '/api/1/account_items', queryParams, null);
     if (accountItemsRes && accountItemsRes.account_items) {
       const activeAccountItems = accountItemsRes.account_items.filter(item => item.available !== false);
+      // AI(Gemini)の推測対象とするため、必ずB列(2列目)に識別用の名称('name'や'name_ja'等)が来るように配置する
       writeToSheet(ss, 'マスタfreee勘定科目', activeAccountItems, [
         'id', 'name', 'shortcut', 'shortcut_num', 'tax_code', 'account_category', 'account_category_id', 'group_name'
       ]);
@@ -61,6 +62,7 @@ function fetchFreeeMasters() {
     const taxesRes = callFreeeApi('get', `/api/1/taxes/companies/${companyId}`, null, null);
     if (taxesRes && taxesRes.taxes) {
       const activeTaxes = taxesRes.taxes.filter(item => item.available !== false);
+      // AI(Gemini)の推測対象とするため、必ずB列(2列目)に識別用の名称('name_ja'等)が来るように配置する
       writeToSheet(ss, 'マスタfreee税区分', activeTaxes, [
         'code', 'name_ja', 'name', 'display_name', 'available'
       ]);
@@ -72,6 +74,7 @@ function fetchFreeeMasters() {
     const walletablesRes = callFreeeApi('get', '/api/1/walletables', { company_id: companyId }, null);
     if (walletablesRes && walletablesRes.walletables) {
       const activeWalletables = walletablesRes.walletables.filter(item => item.available !== false);
+      // AI(Gemini)の推測対象とするため、B列(2列目)に'name'を配置する
       writeToSheet(ss, 'マスタfreee口座', activeWalletables, [
         'id', 'name', 'type', 'bank_id'
       ]);
@@ -83,6 +86,7 @@ function fetchFreeeMasters() {
     const partnersRes = callFreeeApi('get', '/api/1/partners', queryParams, null);
     if (partnersRes && partnersRes.partners) {
       const activePartners = partnersRes.partners.filter(item => item.available !== false);
+      // AI(Gemini)の推測対象とするため、B列(2列目)に'name'を配置する
       writeToSheet(ss, 'マスタfreee取引先', activePartners, [
         'id', 'name', 'code', 'name_kana', 'partner_doc_friendly_name'
       ]);
@@ -94,6 +98,7 @@ function fetchFreeeMasters() {
     const itemsRes = callFreeeApi('get', '/api/1/items', queryParams, null);
     if (itemsRes && itemsRes.items) {
       const activeItems = itemsRes.items.filter(item => item.available !== false);
+      // AI(Gemini)の推測対象とするため、B列(2列目)に'name'を配置する
       writeToSheet(ss, 'マスタfreee品目', activeItems, [
         'id', 'name'
       ]);
@@ -105,6 +110,7 @@ function fetchFreeeMasters() {
     const sectionsRes = callFreeeApi('get', '/api/1/sections', queryParams, null);
     if (sectionsRes && sectionsRes.sections) {
       const activeSections = sectionsRes.sections.filter(item => item.available !== false);
+      // AI(Gemini)の推測対象とするため、B列(2列目)に'name'を配置する
       writeToSheet(ss, 'マスタfreee部門', activeSections, [
         'id', 'name', 'long_name', 'company_id'
       ]);
@@ -116,6 +122,7 @@ function fetchFreeeMasters() {
     const tagsRes = callFreeeApi('get', '/api/1/tags', queryParams, null);
     if (tagsRes && tagsRes.tags) {
       const activeTags = tagsRes.tags.filter(item => item.available !== false);
+      // AI(Gemini)の推測対象とするため、B列(2列目)に'name'を配置する
       writeToSheet(ss, 'マスタfreeeメモタグ', activeTags, [
         'id', 'name'
       ]);

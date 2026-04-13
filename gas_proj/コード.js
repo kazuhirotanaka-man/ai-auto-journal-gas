@@ -58,11 +58,20 @@ function showSidebar() {
  * ユーザーがサイズ変更や移動が可能で、より大きく表示できます
  */
 function showDialog() {
-  const html = HtmlService.createHtmlOutputFromFile('Popup')
-    .setTitle('証憑プレビューと仕訳確認')
-    .setWidth(1500)
-    .setHeight(770);
-  SpreadsheetApp.getUi().showModelessDialog(html, '証憑プレビューと仕訳確認');
+  const config = ConfigService.getAllConfig();
+  if (config.accountingSoftware === "freee会計") {
+    const html = HtmlService.createHtmlOutputFromFile('freee_Popup')
+      .setTitle('証憑プレビューと仕訳確認 (freee会計)')
+      .setWidth(1500)
+      .setHeight(770);
+    SpreadsheetApp.getUi().showModelessDialog(html, '証憑プレビューと仕訳確認 (freee会計)');
+  } else {
+    const html = HtmlService.createHtmlOutputFromFile('Popup')
+      .setTitle('証憑プレビューと仕訳確認')
+      .setWidth(1500)
+      .setHeight(770);
+    SpreadsheetApp.getUi().showModelessDialog(html, '証憑プレビューと仕訳確認');
+  }
 }
 
 /**
@@ -133,7 +142,7 @@ function processNewReceipts() {
       const parsedData = GeminiService.analyzeReceipt(file, config);
 
       // シートに追記
-      JournalService.appendJournalEntry(parsedData, file);
+      JournalService.appendJournalEntry(parsedData, file, config);
 
       // ログに記録
       JournalService.logProcessedFile(file);
@@ -155,14 +164,25 @@ function processNewReceipts() {
  * @returns {object} 行データと設定情報のオブジェクト
  */
 function getPopupData(rowIndex) {
+  console.time(`getPopupData-total`);
+  console.time(`get-ConfigService`);
+  const config = ConfigService.getAllConfig();
+  console.timeEnd(`get-ConfigService`);
+  
+  const isFreee = config.accountingSoftware === "freee会計";
+  const sheetName = isFreee ? 'freee取引データ' : '仕訳データ';
+  const dataColumns = isFreee ? 19 : 13;
+  const fileIdColIndex = isFreee ? 17 : 11; // 0-indexed
+
+  console.time(`get-SheetAccess`);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('仕訳データ');
+  const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return null;
 
   let targetRow = rowIndex;
   if (!targetRow) {
     const activeRange = SpreadsheetApp.getActiveRange();
-    if (!activeRange || activeRange.getSheet().getName() !== '仕訳データ') {
+    if (!activeRange || activeRange.getSheet().getName() !== sheetName) {
       return null;
     }
     targetRow = activeRange.getRow();
@@ -173,42 +193,145 @@ function getPopupData(rowIndex) {
   const maxRow = sheet.getLastRow();
   if (targetRow > maxRow) return null; // データがない行
 
-  // 行のデータを取得 (1列目〜13列目)
-  const rowData = sheet.getRange(targetRow, 1, 1, 13).getValues()[0];
-  if (!rowData[0] && !rowData[11]) return null; // データが空（日付もIDもない）
+  // 行のデータを取得
+  const rowData = sheet.getRange(targetRow, 1, 1, dataColumns).getValues()[0];
+  if (!rowData[0] && !rowData[fileIdColIndex]) return null; // データが空
 
-  const config = ConfigService.getAllConfig();
+  if (isFreee) {
+    // 1列目（収支）が空白の場合、空白でなくなるまで上方向に遡って取引の開始行（Head）を見つける
+    while (targetRow >= 2) {
+      if (sheet.getRange(targetRow, 1).getValue() !== "") {
+        break;
+      }
+      targetRow--;
+    }
+    // 万が一見つからなかった場合は元の行を採用
+    if (targetRow < 2) targetRow = rowIndex;
 
-  // 日付のフォーマット処理
-  let dateVal = rowData[0];
-  if (dateVal instanceof Date) {
-    dateVal = Utilities.formatDate(dateVal, ss.getSpreadsheetTimeZone() || "Asia/Tokyo", "yyyy-MM-dd");
-  } else if (dateVal !== "" && dateVal != null) {
-    dateVal = String(dateVal).replace(/\//g, "-");
+    const headRowRange = sheet.getRange(targetRow, 1, 1, dataColumns);
+    const headRowData = headRowRange.getValues()[0];
+    const fileId = headRowData[17] ? String(headRowData[17]) : null;
+    console.timeEnd(`get-SheetAccess`);
+
+    // Head行から下方向に、同じfileIdかつ収支が空白（＝同一取引の明細）である行を取得し続ける
+    console.time(`get-loopDetails`);
+    let detailsData = [];
+    let currentRow = targetRow;
+    
+    while (currentRow <= maxRow) {
+      const rowVars = sheet.getRange(currentRow, 1, 1, dataColumns).getValues()[0];
+      const rFileId = rowVars[17] ? String(rowVars[17]) : null;
+      
+      // 最初（Head行）は無条件で追加。2行目以降は fileIdが同じ ＆ 収支(rowVars[0])が空白 なら同じ取引とみなす。
+      if (currentRow === targetRow || (rFileId === fileId && rowVars[0] === "")) {
+        detailsData.push(rowVars);
+      } else {
+        break; // 別の取引が始まったか、別のファイルになった場合は終了
+      }
+      currentRow++;
+    }
+    console.timeEnd(`get-loopDetails`);
+
+    const rowCount = detailsData.length;
+
+    console.time(`get-FormatData`);
+    const parseDateRaw = function(rawDate) {
+      if (rawDate instanceof Date) {
+        return Utilities.formatDate(rawDate, ss.getSpreadsheetTimeZone() || "Asia/Tokyo", "yyyy-MM-dd");
+      } else if (rawDate !== "" && rawDate != null) {
+        // AI出力が "2024/4/1" などゼロ埋めされていない場合への対応
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          return Utilities.formatDate(d, ss.getSpreadsheetTimeZone() || "Asia/Tokyo", "yyyy-MM-dd");
+        }
+        return String(rawDate).replace(/\//g, "-");
+      }
+      return "";
+    };
+
+    const retData = {
+      startRowIndex: targetRow,
+      rowCount: rowCount,
+      fileId: fileId,
+      data: {
+        transaction: {
+          incomeExpense: headRowData[0],
+          date: parseDateRaw(headRowData[1]),
+          partner: headRowData[2],
+          registrationNumber: headRowData[3],
+          paymentStatus: headRowData[4],
+          paymentDate: parseDateRaw(headRowData[5]),
+          wallet: headRowData[6],
+          status: headRowData[18] || '未確認',
+          warningText: headRowData[16],
+          guessedDocumentType: headRowData[14],
+          guessedPaymentMethod: headRowData[15]
+        },
+        details: detailsData.map(row => ({
+          accountItem: row[7],
+          amount: row[8],
+          taxCategory: row[9],
+          item: row[10],
+          department: row[11],
+          memoTag: row[12],
+          description: row[13]
+        }))
+      },
+      // ドロップダウン用のリスト(freee用)
+      freeeAccountsList: config.freeeAccountsList || [],
+      freeeTaxCategoryList: config.freeeTaxCategoryList || [],
+      freeeWalletsList: config.freeeWalletsList || [],
+      freeePartnersList: config.freeePartnersList || [],
+      freeeItemsList: config.freeeItemsList || [],
+      freeeDepartmentsList: config.freeeDepartmentsList || [],
+      freeeTagsList: config.freeeTagsList || []
+    };
+    console.timeEnd(`get-FormatData`);
+    console.timeEnd(`getPopupData-total`);
+    return retData;
+  } else {
+    // 弥生用ロジック
+    console.timeEnd(`get-SheetAccess`);
+    console.time(`get-FormatData`);
+    // 日付のフォーマット処理
+    let dateVal = rowData[0];
+    if (dateVal instanceof Date) {
+      dateVal = Utilities.formatDate(dateVal, ss.getSpreadsheetTimeZone() || "Asia/Tokyo", "yyyy-MM-dd");
+    } else if (dateVal !== "" && dateVal != null) {
+      const d = new Date(dateVal);
+      if (!isNaN(d.getTime())) {
+        dateVal = Utilities.formatDate(d, ss.getSpreadsheetTimeZone() || "Asia/Tokyo", "yyyy-MM-dd");
+      } else {
+        dateVal = String(dateVal).replace(/\//g, "-");
+      }
+    }
+
+    const retData = {
+      rowIndex: targetRow,
+      fileId: rowData[11] ? String(rowData[11]) : null,
+      data: {
+        date: dateVal,
+        debitAccount: rowData[1],
+        debitSubAccount: rowData[2],
+        debitTax: rowData[3],
+        debitAmount: rowData[4],
+        creditAccount: rowData[5],
+        creditSubAccount: rowData[6],
+        creditTax: rowData[7],
+        creditAmount: rowData[8],
+        description: rowData[9],
+        warningText: rowData[10],
+        status: rowData[12] || '未確認'
+      },
+      // ドロップダウン用のリスト
+      accountsList: config.accountsList || [],
+      subAccountsList: config.subAccountsList || [],
+      taxCategoryList: config.taxCategoryList || []
+    };
+    console.timeEnd(`get-FormatData`);
+    console.timeEnd(`getPopupData-total`);
+    return retData;
   }
-
-  return {
-    rowIndex: targetRow,
-    fileId: rowData[11] ? String(rowData[11]) : null,
-    data: {
-      date: dateVal,
-      debitAccount: rowData[1],
-      debitSubAccount: rowData[2],
-      debitTax: rowData[3],
-      debitAmount: rowData[4],
-      creditAccount: rowData[5],
-      creditSubAccount: rowData[6],
-      creditTax: rowData[7],
-      creditAmount: rowData[8],
-      description: rowData[9],
-      warningText: rowData[10],
-      status: rowData[12] || '未確認'
-    },
-    // ドロップダウン用のリスト
-    accountsList: config.accountsList || [],
-    subAccountsList: config.subAccountsList || [],
-    taxCategoryList: config.taxCategoryList || []
-  };
 }
 
 /**
@@ -219,58 +342,187 @@ function getPopupData(rowIndex) {
  * @returns {object} 次(または前)の行のデータ、なければnull
  */
 function updateAndProcessNext(rowIndex, updateData, action) {
+  console.time(`updateAndProcessNext-total`);
+
+  console.time(`update-ConfigService`);
+  const config = ConfigService.getAllConfig();
+  console.timeEnd(`update-ConfigService`);
+
+  const isFreee = config.accountingSoftware === "freee会計";
+  const sheetName = isFreee ? 'freee取引データ' : '仕訳データ';
+  const dataColumns = isFreee ? 19 : 13;
+
+  console.time(`update-SheetUpdate`);
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('仕訳データ');
+  const sheet = ss.getSheetByName(sheetName);
 
   if ((action === 'save' || action === 'exclude') && updateData) {
-    // データの更新 (1〜10列目と13列目)
-    const range = sheet.getRange(rowIndex, 1, 1, 13);
-    const currentValues = range.getValues()[0];
+    if (isFreee) {
+      const rowCount = updateData.details.length;
+      const range = sheet.getRange(rowIndex, 1, rowCount, dataColumns);
+      const values = range.getValues();
 
-    // updateDataの内容で上書き
-    currentValues[0] = updateData.date;
-    currentValues[1] = updateData.debitAccount;
-    currentValues[2] = updateData.debitSubAccount;
-    currentValues[3] = updateData.debitTax;
-    currentValues[4] = updateData.debitAmount;
-    currentValues[5] = updateData.creditAccount;
-    currentValues[6] = updateData.creditSubAccount;
-    currentValues[7] = updateData.creditTax;
-    currentValues[8] = updateData.creditAmount;
-    currentValues[9] = updateData.description;
+      values.forEach((currentValues, i) => {
+        if (i === 0) {
+          // Head行
+          currentValues[0] = updateData.transaction.incomeExpense;
+          currentValues[1] = updateData.transaction.date;
+          currentValues[2] = updateData.transaction.partner;
+          currentValues[3] = updateData.transaction.registrationNumber;
+          currentValues[4] = updateData.transaction.paymentStatus;
+          currentValues[5] = updateData.transaction.paymentDate;
+          currentValues[6] = updateData.transaction.wallet;
+        } else {
+          // 明細行は取引基本項目を空白にする
+          currentValues[0] = "";
+          currentValues[1] = "";
+          currentValues[2] = "";
+          currentValues[3] = "";
+          currentValues[4] = "";
+          currentValues[5] = "";
+          currentValues[6] = "";
+        }
 
-    // ステータスと背景色の更新
-    if (action === 'exclude') {
-      currentValues[12] = '対象外';
-      range.setBackground("#e0e0e0"); // 灰色
-      currentValues[10] = '対象外';
-    } else {
-      // save の場合はステータスを確認済等に
-      currentValues[12] = updateData.status || '確認済';
-      if (currentValues[12] === '確認済') {
-        range.setBackground(null); // 背景色クリア
-        currentValues[10] = "確認済"; // 警告クリア
+        const detail = updateData.details[i];
+        currentValues[7] = detail.accountItem;
+        currentValues[8] = detail.amount;
+        currentValues[9] = detail.taxCategory;
+        currentValues[10] = detail.item;
+        currentValues[11] = detail.department;
+        currentValues[12] = detail.memoTag;
+        currentValues[13] = detail.description;
+
+        if (action === 'exclude') {
+          currentValues[18] = '対象外';
+        } else {
+          currentValues[18] = updateData.status || '確認済';
+        }
+      });
+      range.setValues(values);
+      if (action === 'exclude') {
+        range.setBackground("#e0e0e0");
+      } else {
+        if (updateData.status === '確認済' || !updateData.status) {
+          range.setBackground(null);
+        }
       }
+    } else {
+      const range = sheet.getRange(rowIndex, 1, 1, dataColumns);
+      const currentValues = range.getValues()[0];
+
+      // データの更新 (1〜10列目と13列目)
+      // updateDataの内容で上書き
+      currentValues[0] = updateData.date;
+      currentValues[1] = updateData.debitAccount;
+      currentValues[2] = updateData.debitSubAccount;
+      currentValues[3] = updateData.debitTax;
+      currentValues[4] = updateData.debitAmount;
+      currentValues[5] = updateData.creditAccount;
+      currentValues[6] = updateData.creditSubAccount;
+      currentValues[7] = updateData.creditTax;
+      currentValues[8] = updateData.creditAmount;
+      currentValues[9] = updateData.description;
+
+      // ステータスと背景色の更新
+      if (action === 'exclude') {
+        currentValues[12] = '対象外';
+        range.setBackground("#e0e0e0"); // 灰色
+      } else {
+        // save の場合はステータスを確認済等に
+        currentValues[12] = updateData.status || '確認済';
+        if (currentValues[12] === '確認済') {
+          range.setBackground(null); // 背景色クリア
+        }
+      }
+      
+      range.setValues([currentValues]);
     }
-
-    range.setValues([currentValues]);
   }
+  console.timeEnd(`update-SheetUpdate`);
 
+  console.time(`update-findNextRow`);
   // 移動先の行を決定
   let nextRow = rowIndex;
   if (action === 'back') {
+    // 1つ前の行に移動（getPopupData がそこから上に遡って Head を特定します）
     nextRow = rowIndex - 1;
   } else {
-    nextRow = rowIndex + 1;
+    // 複数明細の場合は、更新した明細の行数分だけスキップする
+    const step = (updateData && updateData.details) ? updateData.details.length : 1;
+    nextRow = rowIndex + step;
   }
 
   const maxRow = sheet.getLastRow();
   if (nextRow < 2 || nextRow > maxRow) {
+    console.timeEnd(`update-findNextRow`);
+    console.timeEnd(`updateAndProcessNext-total`);
     return null; // 端に到達した
   }
 
   // シート側の選択行も移動させる
   sheet.getRange(nextRow, 1).activate();
+  console.timeEnd(`update-findNextRow`);
 
-  return getPopupData(nextRow);
+  console.time(`update-getPopupData_call`);
+  const nextData = getPopupData(nextRow);
+  console.timeEnd(`update-getPopupData_call`);
+  
+  console.timeEnd(`updateAndProcessNext-total`);
+  return nextData;
 }
+
+/**
+ * freeeモードでの明細行プレビュー削除
+ * @param {number} rowIndex 取引の先頭行
+ * @param {number} detailIndex 削除する明細のインデックス(0から)
+ */
+function deleteFreeeDetailRow(rowIndex, detailIndex) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('freee取引データ');
+  const targetRow = rowIndex + detailIndex;
+  
+  if (detailIndex === 0) {
+    const currentRowData = sheet.getRange(targetRow, 1, 1, 19).getValues()[0];
+    const fileId = currentRowData[17];
+    
+    const maxRow = sheet.getLastRow();
+    if (targetRow < maxRow) {
+      const nextRowRange = sheet.getRange(targetRow + 1, 1, 1, 19);
+      const nextRowData = nextRowRange.getValues()[0];
+      
+      // 次の行が同じ取引の明細行である場合（fileIdが同じで、収支が空の場合）
+      if (nextRowData[17] === fileId && nextRowData[0] === "") {
+        // 先頭行の情報を引き継ぐ
+        nextRowData[0] = currentRowData[0]; // 収支
+        nextRowData[1] = currentRowData[1]; // 発生日
+        nextRowData[2] = currentRowData[2]; // 取引先
+        nextRowData[3] = currentRowData[3]; // 登録番号
+        nextRowData[4] = currentRowData[4]; // 決済ステータス
+        nextRowData[5] = currentRowData[5]; // 決済期日
+        nextRowData[6] = currentRowData[6]; // 決済口座
+        nextRowData[14] = currentRowData[14]; // 推測ドキュメント
+        nextRowData[15] = currentRowData[15]; // 推測決済手段
+        nextRowData[16] = currentRowData[16]; // 警告テキスト
+        nextRowData[17] = currentRowData[17]; // fileId
+        nextRowData[18] = currentRowData[18]; // ステータス
+        
+        const bg = sheet.getRange(targetRow, 1, 1, 19).getBackgrounds()[0];
+        nextRowRange.setValues([nextRowData]);
+        nextRowRange.setBackgrounds([bg]);
+      }
+    }
+  }
+  
+  sheet.deleteRow(targetRow);
+  
+  // 削除後に再読み込み
+  // もし1行しかなくてそれが削除された場合、rowIndexには次の取引が来ているはずなのでそのまま読める
+  const maxRowPostDelete = sheet.getLastRow();
+  if (rowIndex > maxRowPostDelete || rowIndex < 2) {
+    return null; // 全てなくなった場合
+  }
+  
+  // rowIndexの行を選択しておく
+  sheet.getRange(rowIndex, 1).activate();
+  return getPopupData(rowIndex);
+}
+

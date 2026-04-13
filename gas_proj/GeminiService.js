@@ -40,12 +40,81 @@ const GeminiService = {
     const businessInfo = config.businessDetails ? `具体的な事業内容: ${config.businessDetails}` : "";
     const businessContext = (industryInfo || businessInfo) ? `${industryInfo ? industryInfo + "\\n" : ""}${businessInfo ? businessInfo + "\\n" : ""}※この業種・事業内容特有の経費科目や取引の性質を考慮して仕訳を推測してください。` : "";
 
-    const accountsInfo = config.accountsList.length > 0 ? `勘定科目の候補: [${config.accountsList.join(", ")}]` : "適切な勘定科目を推測してください。";
-    const subAccountsInfo = config.subAccountsList.length > 0 ? `補助科目の候補: [${config.subAccountsList.join(", ")}]` : "補助科目は（明確に指定がない限り）空欄にしてください。";
-    const taxCategoryInfo = config.taxCategoryList && config.taxCategoryList.length > 0 ? `税区分の候補: [${config.taxCategoryList.join(", ")}]` : "税区分は適切なものを推測するか空欄にしてください。";
-    const extraPromptInfo = config.extraPrompt ? `追加の指針: ${config.extraPrompt}` : "";
+    let systemPrompt = "";
 
-    const systemPrompt = `
+    if (config.accountingSoftware === "freee会計") {
+      const accountsInfo = config.freeeAccountsList && config.freeeAccountsList.length > 0 ? `勘定科目の候補: [${config.freeeAccountsList.join(", ")}]` : "適切な勘定科目を推測してください。";
+      const taxCategoryInfo = config.freeeTaxCategoryList && config.freeeTaxCategoryList.length > 0 ? `税区分の候補: [${config.freeeTaxCategoryList.join(", ")}]` : "税区分は適切なものを推測するか空欄にしてください。";
+      const walletsInfo = config.freeeWalletsList && config.freeeWalletsList.length > 0 ? `決済口座の候補: [${config.freeeWalletsList.join(", ")}]` : "決済口座は適切なものを推測するか空欄にしてください。";
+      const partnersInfo = config.freeePartnersList && config.freeePartnersList.length > 0 ? `取引先の候補: [${config.freeePartnersList.join(", ")}]` : "取引先は証憑から読み取ってください。";
+      const itemsInfo = config.freeeItemsList && config.freeeItemsList.length > 0 ? `品目の候補: [${config.freeeItemsList.join(", ")}]` : "品目は空欄または証憑から読み取った一般的な名称にしてください。";
+      const deptsInfo = config.freeeDepartmentsList && config.freeeDepartmentsList.length > 0 ? `部門の候補: [${config.freeeDepartmentsList.join(", ")}]` : "部門は空欄にしてください。";
+      const tagsInfo = config.freeeTagsList && config.freeeTagsList.length > 0 ? `メモタグの候補: [${config.freeeTagsList.join(", ")}]` : "メモタグは空欄にしてください。";
+      
+      systemPrompt = `
+あなたはプロの会計事務所職員です。添付された証憑画像（領収書、請求書など）を解析し、freee会計向けの仕訳データを作成してください。
+以下のJSONフォーマットで回答してください。JSON以外のテキストは出力しないでください。
+
+前提条件：
+${fileNameInfo}
+${companyNameInfo}
+${businessContext}
+${config.extraPrompt ? `追加の指針: ${config.extraPrompt}` : ""}
+
+条件：
+1. ${accountsInfo} ここから最も適切なものを選んでください。
+2. ${taxCategoryInfo}
+3. ${walletsInfo}
+4. ${partnersInfo}
+5. ${itemsInfo}
+6. ${deptsInfo}
+7. ${tagsInfo}
+8. 収支は「収入」「支出」のいずれか。
+9. 決済ステータスは「決済済」「未決済」のいずれか。未決済の場合は「決済口座」を空文字列("")にしてください。決済済みの場合のみは決済口座を設定してください。
+10. 発生日と決済期日は YYYY/MM/DD 形式。読み取れない場合は空欄。決済期日は必ず発生日以降の日付にしてください。
+11. 金額は数値（カンマなし）。
+12. 推測証票種別は「受取請求書」「領収書・レシート」「発行請求書」「クレカ利用明細」「その他」から選択してください。
+13. 推測決済方法は証票が「受取請求書」「領収書・レシート」の場合、「現金」「クレジットカード」「振込・引落し」から選択してください。
+14. 適格請求書発行事業者登録番号（"T"とそれに続く13桁の数字。例: T1234567890123）が記載されている場合は、"registrationNumber"に抽出してください。記載がない場合は空文字列("")にしてください。
+15. confidenceは、読み取り結果に対する自信度（"高", "中", "低"）を入れてください。
+16. 1つの証憑から複数の異なる取引明細（異なる税率、異なる勘定科目など）が読み取れる場合は、配列 "entries" の中に複数の明細データを含めてください。
+17. そもそも会計の取引記録として不要な画像（単なるメモ、他の証憑と重複、業務に無関係なもの等）であると判断した場合は、"isTarget": false とし、その理由を最初の "description" に入れてください。
+
+出力フォーマット（JSON）:
+{
+  "isTarget": true,
+  "description": "",
+  "entries": [
+    {
+      "incomeExpense": "支出",
+      "accrualDate": "YYYY/MM/DD",
+      "partner": "Amazon",
+      "paymentStatus": "決済済",
+      "paymentDate": "YYYY/MM/DD",
+      "wallet": "現金",
+      "accountItem": "消耗品費",
+      "amount": 1000,
+      "taxCategory": "課税仕入",
+      "item": "事務用品",
+      "department": "営業部",
+      "memoTag": "",
+      "registrationNumber": "T1234567890123",
+      "remarks": "ボールペン",
+      "guessedDocumentType": "領収書・レシート",
+      "guessedPaymentMethod": "現金",
+      "confidence": "高"
+    }
+  ]
+}
+`;
+    } else {
+      // 弥生会計・その他の汎用モード
+      const accountsInfo = config.accountsList && config.accountsList.length > 0 ? `勘定科目の候補: [${config.accountsList.join(", ")}]` : "適切な勘定科目を推測してください。";
+      const subAccountsInfo = config.subAccountsList && config.subAccountsList.length > 0 ? `補助科目の候補: [${config.subAccountsList.join(", ")}]` : "補助科目は（明確に指定がない限り）空欄にしてください。";
+      const taxCategoryInfo = config.taxCategoryList && config.taxCategoryList.length > 0 ? `税区分の候補: [${config.taxCategoryList.join(", ")}]` : "税区分は適切なものを推測するか空欄にしてください。";
+      const extraPromptInfo = config.extraPrompt ? `追加の指針: ${config.extraPrompt}` : "";
+
+      systemPrompt = `
 あなたはプロの会計事務所職員です。添付された証憑画像（領収書、請求書など）を解析し、仕訳データを作成してください。
 以下のJSONフォーマットで回答してください。JSON以外のテキストは出力しないでください。
 
@@ -86,6 +155,7 @@ ${businessContext}
   ]
 }
 `;
+    }
 
     // Gemini 2.0 Flash Lite (ご指定の Flash Lite を使用)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`;
