@@ -2,6 +2,7 @@
  * 設定シート等で定義された「名前付き範囲」から設定値を取得するサービス
  */
 const ConfigService = {
+  _cache: null,
   /**
    * 名前付き範囲から単一のセルの値を取得する
    * 範囲が見つからない場合はエラーではなく空文字を返す（任意項目のため）
@@ -62,6 +63,19 @@ const ConfigService = {
    * 現在の全ての設定オブジェクトを取得する
    */
   getAllConfig: function () {
+    if (this._cache) return this._cache;
+
+    const cache = CacheService.getScriptCache();
+    const cachedConfig = cache.get('APP_CONFIG_CACHE');
+    if (cachedConfig) {
+      try {
+        this._cache = JSON.parse(cachedConfig);
+        return this._cache;
+      } catch (e) {
+        // パースエラーの場合は再取得へフォールバック
+      }
+    }
+
     const config = {
       companyName: this.getValue("設定_自社名"),
       industryType: this.getValue("設定_業種"),
@@ -85,7 +99,22 @@ const ConfigService = {
       config.freeeTagsList = this.getFreeeMasterList("マスタfreeeメモタグ");
     }
 
+    this._cache = config;
+    try {
+      cache.put('APP_CONFIG_CACHE', JSON.stringify(config), 3600); // 1時間のキャッシュ
+    } catch (e) {}
+
     return config;
+  },
+
+  /**
+   * キャッシュをクリアする
+   */
+  clearCache: function () {
+    this._cache = null;
+    try {
+      CacheService.getScriptCache().remove('APP_CONFIG_CACHE');
+    } catch (e) {}
   },
 
   /**

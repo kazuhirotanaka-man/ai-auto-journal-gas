@@ -526,3 +526,13 @@ function deleteFreeeDetailRow(rowIndex, detailIndex) {
   return getPopupData(rowIndex);
 }
 
+/**
+ * シートが手動編集されたときの自動トリガー
+ */
+function onEdit(e) {
+  if (!e || !e.source) return;
+  const sheetName = e.source.getActiveSheet().getName();
+  if (sheetName.startsWith('設定') || sheetName.startsWith('マスタ')) {
+    ConfigService.clearCache();
+  }
+}

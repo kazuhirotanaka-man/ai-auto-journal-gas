@@ -131,6 +131,7 @@ function fetchFreeeMasters() {
     // Toastを消す(別のメッセージで上書き)
     try {
       ss.toast('すべてのマスタ情報の取得・シート反映が完了しました。', '完了', 5);
+      ConfigService.clearCache(); // マスタ更新によりキャッシュをクリアする
     } catch (e) {}
 
     ui.alert('完了', 'すべてのマスタの取得とシートへの書き出しが完了しました。', ui.ButtonSet.OK);
