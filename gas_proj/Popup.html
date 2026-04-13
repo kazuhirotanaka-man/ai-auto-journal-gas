@@ -1,353 +1,415 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <base target="_top">
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        height: 100vh;
-        overflow: hidden;
-        background: #f9f9f9;
-        color: #333;
+
+<head>
+  <base target="_top">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: #f9f9f9;
+      color: #333;
+    }
+
+    #preview-container {
+      flex: 1;
+      border-right: 1px solid #ccc;
+      background: #fff;
+    }
+
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    #form-container {
+      width: 420px;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      color: #555;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .row-flex {
+      display: flex;
+      gap: 10px;
+    }
+
+    .row-flex>div {
+      flex: 1;
+    }
+
+    .buttons {
+      margin-top: auto;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      padding-bottom: 10px;
+    }
+
+    button {
+      flex: 1;
+      padding: 10px 4px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s linear infinite;
+      vertical-align: middle;
+    }
+
+    .btn-secondary .spinner {
+      border-color: rgba(0, 0, 0, 0.1);
+      border-top-color: #333;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
       }
-      #preview-container {
-        flex: 1;
-        border-right: 1px solid #ccc;
-        background: #fff;
+
+      100% {
+        transform: rotate(360deg);
       }
-      iframe {
-        width: 100%;
-        height: 100%;
-        border: none;
-      }
-      #form-container {
-        width: 420px;
-        padding: 20px;
-        box-sizing: border-box;
-        overflow-y: auto;
-        background: #fff;
-        display: flex;
-        flex-direction: column;
-      }
-      .form-group {
-        margin-bottom: 12px;
-      }
-      label {
-        display: block;
-        font-size: 12px;
-        font-weight: bold;
-        margin-bottom: 4px;
-        color: #555;
-      }
-      input, select, textarea {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 6px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 13px;
-      }
-      .row-flex {
-        display: flex;
-        gap: 10px;
-      }
-      .row-flex > div {
-        flex: 1;
-      }
-      .buttons {
-        margin-top: auto;
-        padding-top: 20px;
-        border-top: 1px solid #eee;
-        display: flex;
-        flex-direction: row;
-        gap: 8px;
-        padding-bottom: 10px;
-      }
-      button {
-        flex: 1;
-        padding: 10px 4px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 13px;
-      }
-      button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-      .spinner {
-        display: inline-block;
-        width: 14px;
-        height: 14px;
-        border: 2px solid rgba(255,255,255,0.4);
-        border-radius: 50%;
-        border-top-color: #fff;
-        animation: spin 1s linear infinite;
-        vertical-align: middle;
-      }
-      .btn-secondary .spinner {
-        border-color: rgba(0,0,0,0.1);
-        border-top-color: #333;
-      }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-      .btn-primary { background: #1a73e8; color: white; }
-      .btn-primary:hover { background: #1557b0; }
-      .btn-secondary { background: #f1f3f4; color: #3c4043; border: 1px solid #dadce0; }
-      .btn-secondary:hover { background: #e8eaed; }
-      .btn-danger { background: #ea4335; color: white; }
-      .btn-danger:hover { background: #c5221f; }
-      
-      #status-msg { margin-bottom: 15px; font-size: 14px; color: #1a73e8; font-weight: bold; }
-      #warning-text { color: #ea4335; font-weight: bold; font-size: 13px; margin-bottom: 15px; min-height: 18px; }
-      
-      .box-area {
-        border: 1px solid #e0e0e0;
-        padding: 12px;
-        border-radius: 6px;
-        margin-bottom: 12px;
-        background: #fafafa;
-      }
-      .box-label {
-        font-size: 13px;
-        font-weight: bold;
-        color: #1a73e8;
-        margin-bottom: 10px;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="preview-container">
-      <iframe id="preview-frame" src=""></iframe>
-    </div>
-    
-    <div id="form-container">
+    }
+
+    .btn-primary {
+      background: #1a73e8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #1557b0;
+    }
+
+    .btn-secondary {
+      background: #f1f3f4;
+      color: #3c4043;
+      border: 1px solid #dadce0;
+    }
+
+    .btn-secondary:hover {
+      background: #e8eaed;
+    }
+
+    .btn-danger {
+      background: #ea4335;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c5221f;
+    }
+
+    .header-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 15px;
+      min-height: 18px;
+    }
+
+    #status-msg {
+      font-size: 14px;
+      color: #1a73e8;
+      font-weight: bold;
+    }
+
+    #warning-text {
+      color: #ea4335;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .box-area {
+      border: 1px solid #e0e0e0;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      background: #fafafa;
+    }
+
+    .box-label {
+      font-size: 13px;
+      font-weight: bold;
+      color: #1a73e8;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="preview-container">
+    <iframe id="preview-frame" src=""></iframe>
+  </div>
+
+  <div id="form-container">
+    <div class="header-info-row">
       <div id="status-msg">読込中...</div>
       <div id="warning-text"></div>
-      
+    </div>
+
+    <input type="hidden" id="ui-status" value="未確認" />
+
+    <div class="form-group">
+      <label>日付</label>
+      <input type="date" id="ui-date" onfocus="try { this.showPicker(); } catch(e) {}" />
+    </div>
+
+    <div class="box-area">
+      <div class="box-label">借方 (左)</div>
       <div class="form-group row-flex">
         <div>
-          <label>ステータス</label>
-          <select id="ui-status">
-            <option value="未確認">未確認</option>
-            <option value="確認済">確認済</option>
-            <option value="ダウンロード済み">ダウンロード済み</option>
-            <option value="対象外">対象外</option>
-          </select>
+          <label>勘定科目</label>
+          <select id="ui-debitAccount"></select>
         </div>
         <div>
-          <label>日付</label>
-          <input type="date" id="ui-date" onfocus="try { this.showPicker(); } catch(e) {}" />
+          <label>補助科目</label>
+          <select id="ui-debitSubAccount"></select>
         </div>
       </div>
-
-      <div class="box-area">
-        <div class="box-label">借方 (左)</div>
-        <div class="form-group row-flex">
-          <div>
-            <label>勘定科目</label>
-            <select id="ui-debitAccount"></select>
-          </div>
-          <div>
-            <label>補助科目</label>
-            <select id="ui-debitSubAccount"></select>
-          </div>
+      <div class="form-group row-flex">
+        <div>
+          <label>税区分</label>
+          <select id="ui-debitTax"></select>
         </div>
-        <div class="form-group row-flex">
-          <div>
-            <label>税区分</label>
-            <select id="ui-debitTax"></select>
-          </div>
-          <div>
-            <label>金額</label>
-            <input type="number" id="ui-debitAmount" />
-          </div>
+        <div>
+          <label>金額</label>
+          <input type="number" id="ui-debitAmount" />
         </div>
-      </div>
-
-      <div class="box-area">
-        <div class="box-label">貸方 (右)</div>
-        <div class="form-group row-flex">
-          <div>
-            <label>勘定科目</label>
-            <select id="ui-creditAccount"></select>
-          </div>
-          <div>
-            <label>補助科目</label>
-            <select id="ui-creditSubAccount"></select>
-          </div>
-        </div>
-        <div class="form-group row-flex">
-          <div>
-            <label>税区分</label>
-            <select id="ui-creditTax"></select>
-          </div>
-          <div>
-            <label>金額</label>
-            <input type="number" id="ui-creditAmount" />
-          </div>
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label>摘要</label>
-        <textarea id="ui-description" rows="2"></textarea>
-      </div>
-
-      <div class="buttons">
-        <button id="btn-save" class="btn-primary" onclick="doAction('save', this)">確認済にして次へ</button>
-        <button id="btn-exclude" class="btn-secondary" onclick="doAction('exclude', this)">対象外にして次へ</button>
-        <button id="btn-back" class="btn-secondary" onclick="doAction('back', this)">前に戻る</button>
       </div>
     </div>
 
-    <script>
-      let currentRowIndex = null;
-      let isProcessing = false;
+    <div class="box-area">
+      <div class="box-label">貸方 (右)</div>
+      <div class="form-group row-flex">
+        <div>
+          <label>勘定科目</label>
+          <select id="ui-creditAccount"></select>
+        </div>
+        <div>
+          <label>補助科目</label>
+          <select id="ui-creditSubAccount"></select>
+        </div>
+      </div>
+      <div class="form-group row-flex">
+        <div>
+          <label>税区分</label>
+          <select id="ui-creditTax"></select>
+        </div>
+        <div>
+          <label>金額</label>
+          <input type="number" id="ui-creditAmount" />
+        </div>
+      </div>
+    </div>
 
-      function resetButtons() {
-        document.querySelectorAll('.buttons button').forEach(b => b.disabled = false);
-        const btnSave = document.getElementById('btn-save');
-        const btnExclude = document.getElementById('btn-exclude');
-        const btnBack = document.getElementById('btn-back');
-        if (btnSave) btnSave.innerText = '確認済にして次へ';
-        if (btnExclude) btnExclude.innerText = '対象外にして次へ';
-        if (btnBack) btnBack.innerText = '前に戻る';
-      }
+    <div class="form-group">
+      <label>摘要</label>
+      <textarea id="ui-description" rows="2"></textarea>
+    </div>
 
-      function setStatus(msg) {
-        document.getElementById('status-msg').innerText = msg;
-      }
+    <div class="buttons">
+      <button id="btn-back" class="btn-secondary" onclick="doAction('back', this)">◀前に戻る</button>
+      <button id="btn-save" class="btn-primary" onclick="doAction('save', this)">確認済にして次へ▶</button>
+      <button id="btn-exclude" class="btn-secondary" onclick="doAction('exclude', this)">対象外にして次へ▶</button>
+    </div>
+  </div>
 
-      function populateSelect(selectId, list, currentValue) {
-        const sel = document.getElementById(selectId);
-        sel.innerHTML = '<option value=""></option>';
-        let found = false;
-        
-        if (list && list.length > 0) {
-          list.forEach(item => {
-            const opt = document.createElement('option');
-            opt.value = item;
-            opt.text = item;
-            if (item === currentValue) {
-              opt.selected = true;
-              found = true;
-            }
-            sel.appendChild(opt);
-          });
-        }
-        
-        if (currentValue && !found) {
+  <script>
+    let currentRowIndex = null;
+    let isProcessing = false;
+
+    function resetButtons() {
+      document.querySelectorAll('.buttons button').forEach(b => b.disabled = false);
+      const btnSave = document.getElementById('btn-save');
+      const btnExclude = document.getElementById('btn-exclude');
+      const btnBack = document.getElementById('btn-back');
+      if (btnSave) btnSave.innerText = '確認済にして次へ▶';
+      if (btnExclude) btnExclude.innerText = '対象外にして次へ▶';
+      if (btnBack) btnBack.innerText = '◀前に戻る';
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status-msg').innerText = msg;
+    }
+
+    function populateSelect(selectId, list, currentValue) {
+      const sel = document.getElementById(selectId);
+      sel.innerHTML = '<option value=""></option>';
+      let found = false;
+
+      if (list && list.length > 0) {
+        list.forEach(item => {
           const opt = document.createElement('option');
-          opt.value = currentValue;
-          opt.text = currentValue + " (未登録)";
-          opt.selected = true;
-          sel.appendChild(opt);
-        }
-      }
-
-      function onDataLoaded(res) {
-        resetButtons();
-        if (!res) {
-          setStatus("データが見つかりません。最後の行に到達したか、シートにデータがありません。");
-          document.getElementById('preview-frame').src = "";
-          return;
-        }
-        
-        currentRowIndex = res.rowIndex;
-        setStatus(currentRowIndex + "行目 を確認中");
-
-        if (res.fileId) {
-          document.getElementById('preview-frame').src = "https://drive.google.com/file/d/" + res.fileId + "/preview";
-        } else {
-          document.getElementById('preview-frame').src = "";
-        }
-
-        const d = res.data;
-        document.getElementById('warning-text').innerText = d.warningText ? "警告: " + d.warningText : "";
-        
-        document.getElementById('ui-status').value = d.status || '未確認';
-        document.getElementById('ui-date').value = d.date || '';
-        document.getElementById('ui-debitAmount').value = d.debitAmount !== undefined ? d.debitAmount : '';
-        document.getElementById('ui-creditAmount').value = d.creditAmount !== undefined ? d.creditAmount : '';
-        document.getElementById('ui-description').value = d.description || '';
-
-        populateSelect('ui-debitAccount', res.accountsList, d.debitAccount);
-        populateSelect('ui-creditAccount', res.accountsList, d.creditAccount);
-        populateSelect('ui-debitSubAccount', res.subAccountsList, d.debitSubAccount);
-        populateSelect('ui-creditSubAccount', res.subAccountsList, d.creditSubAccount);
-        populateSelect('ui-debitTax', res.taxCategoryList, d.debitTax);
-        populateSelect('ui-creditTax', res.taxCategoryList, d.creditTax);
-      }
-
-      function loadData(rowIndex) {
-        setStatus("読込中...");
-        document.querySelectorAll('.buttons button').forEach(b => b.disabled = true);
-        google.script.run
-          .withSuccessHandler(function(res) {
-            isProcessing = false;
-            onDataLoaded(res);
-          })
-          .withFailureHandler(function(err) {
-            isProcessing = false;
-            setStatus("エラー: " + err.message);
-            resetButtons();
-          })
-          .getPopupData(rowIndex);
-      }
-
-      function doAction(action, btnTarget) {
-        if (isProcessing) return;
-        if (action === 'back' && !currentRowIndex) return;
-
-        isProcessing = true;
-        setStatus("処理中...");
-
-        document.querySelectorAll('.buttons button').forEach(b => b.disabled = true);
-        if (btnTarget) {
-          btnTarget.innerHTML = '<div class="spinner"></div>';
-        }
-
-        let updateData = null;
-        if (action === 'save' || action === 'exclude') {
-          updateData = {
-            status: document.getElementById('ui-status').value,
-            date: document.getElementById('ui-date').value,
-            debitAccount: document.getElementById('ui-debitAccount').value,
-            debitSubAccount: document.getElementById('ui-debitSubAccount').value,
-            debitTax: document.getElementById('ui-debitTax').value,
-            debitAmount: document.getElementById('ui-debitAmount').value,
-            creditAccount: document.getElementById('ui-creditAccount').value,
-            creditSubAccount: document.getElementById('ui-creditSubAccount').value,
-            creditTax: document.getElementById('ui-creditTax').value,
-            creditAmount: document.getElementById('ui-creditAmount').value,
-            description: document.getElementById('ui-description').value
-          };
-          
-          if (action === 'save' && updateData.status === '未確認') {
-            updateData.status = '確認済';
+          opt.value = item;
+          opt.text = item;
+          if (item === currentValue) {
+            opt.selected = true;
+            found = true;
           }
-        }
-
-        google.script.run
-          .withSuccessHandler(function(res) {
-            onDataLoaded(res);
-            isProcessing = false;
-          })
-          .withFailureHandler(function(err) {
-            setStatus("エラー: " + err.message);
-            isProcessing = false;
-            resetButtons();
-          })
-          .updateAndProcessNext(currentRowIndex, updateData, action);
+          sel.appendChild(opt);
+        });
       }
 
-      window.onload = function() {
-        loadData(null);
-      };
-    </script>
-  </body>
+      if (currentValue && !found) {
+        const opt = document.createElement('option');
+        opt.value = currentValue;
+        opt.text = currentValue + " (未登録)";
+        opt.selected = true;
+        sel.appendChild(opt);
+      }
+    }
+
+    function onDataLoaded(res) {
+      resetButtons();
+      if (!res) {
+        setStatus("データが見つかりません。最後の行に到達したか、シートにデータがありません。");
+        document.getElementById('preview-frame').src = "";
+        return;
+      }
+
+      currentRowIndex = res.rowIndex;
+      const d = res.data;
+      const currentStatus = d.status || '未確認';
+      
+      setStatus(currentRowIndex + "行目 を確認中 （ステータス: " + currentStatus + "）");
+
+      if (res.fileId) {
+        document.getElementById('preview-frame').src = "https://drive.google.com/file/d/" + res.fileId + "/preview";
+      } else {
+        document.getElementById('preview-frame').src = "";
+      }
+
+      document.getElementById('warning-text').innerText = d.warningText ? "AI推測確度: " + d.warningText : "";
+
+      document.getElementById('ui-status').value = currentStatus;
+      document.getElementById('ui-date').value = d.date || '';
+      document.getElementById('ui-debitAmount').value = d.debitAmount !== undefined ? d.debitAmount : '';
+      document.getElementById('ui-creditAmount').value = d.creditAmount !== undefined ? d.creditAmount : '';
+      document.getElementById('ui-description').value = d.description || '';
+
+      populateSelect('ui-debitAccount', res.accountsList, d.debitAccount);
+      populateSelect('ui-creditAccount', res.accountsList, d.creditAccount);
+      populateSelect('ui-debitSubAccount', res.subAccountsList, d.debitSubAccount);
+      populateSelect('ui-creditSubAccount', res.subAccountsList, d.creditSubAccount);
+      populateSelect('ui-debitTax', res.taxCategoryList, d.debitTax);
+      populateSelect('ui-creditTax', res.taxCategoryList, d.creditTax);
+    }
+
+    function loadData(rowIndex) {
+      setStatus("読込中...");
+      document.querySelectorAll('.buttons button').forEach(b => b.disabled = true);
+      google.script.run
+        .withSuccessHandler(function (res) {
+          isProcessing = false;
+          onDataLoaded(res);
+        })
+        .withFailureHandler(function (err) {
+          isProcessing = false;
+          setStatus("エラー: " + err.message);
+          resetButtons();
+        })
+        .getPopupData(rowIndex);
+    }
+
+    function doAction(action, btnTarget) {
+      if (isProcessing) return;
+      if (action === 'back' && !currentRowIndex) return;
+
+      isProcessing = true;
+      setStatus("処理中...");
+
+      document.querySelectorAll('.buttons button').forEach(b => b.disabled = true);
+      if (btnTarget) {
+        btnTarget.innerHTML = '<div class="spinner"></div>';
+      }
+
+      let updateData = null;
+      if (action === 'save' || action === 'exclude') {
+        updateData = {
+          status: document.getElementById('ui-status').value,
+          date: document.getElementById('ui-date').value,
+          debitAccount: document.getElementById('ui-debitAccount').value,
+          debitSubAccount: document.getElementById('ui-debitSubAccount').value,
+          debitTax: document.getElementById('ui-debitTax').value,
+          debitAmount: document.getElementById('ui-debitAmount').value,
+          creditAccount: document.getElementById('ui-creditAccount').value,
+          creditSubAccount: document.getElementById('ui-creditSubAccount').value,
+          creditTax: document.getElementById('ui-creditTax').value,
+          creditAmount: document.getElementById('ui-creditAmount').value,
+          description: document.getElementById('ui-description').value
+        };
+
+        if (action === 'save' && updateData.status === '未確認') {
+          updateData.status = '確認済';
+        }
+      }
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          onDataLoaded(res);
+          isProcessing = false;
+        })
+        .withFailureHandler(function (err) {
+          setStatus("エラー: " + err.message);
+          isProcessing = false;
+          resetButtons();
+        })
+        .updateAndProcessNext(currentRowIndex, updateData, action);
+    }
+
+    window.onload = function () {
+      loadData(null);
+    };
+  </script>
+</body>
+
 </html>
