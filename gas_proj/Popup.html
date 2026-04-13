@@ -258,6 +258,7 @@
 
     <div class="buttons">
       <button id="btn-back" class="btn-secondary" onclick="doAction('back', this)">◀前に戻る</button>
+      <button id="btn-skip" class="btn-secondary" onclick="doAction('justNext', this)">スキップ▶</button>
       <button id="btn-save" class="btn-primary" onclick="doAction('save', this)">確認済にして次へ▶</button>
       <button id="btn-exclude" class="btn-secondary" onclick="doAction('exclude', this)">対象外にして次へ▶</button>
     </div>
@@ -272,9 +273,11 @@
       const btnSave = document.getElementById('btn-save');
       const btnExclude = document.getElementById('btn-exclude');
       const btnBack = document.getElementById('btn-back');
+      const btnSkip = document.getElementById('btn-skip');
       if (btnSave) btnSave.innerText = '確認済にして次へ▶';
       if (btnExclude) btnExclude.innerText = '対象外にして次へ▶';
       if (btnBack) btnBack.innerText = '◀前に戻る';
+      if (btnSkip) btnSkip.innerText = 'スキップ▶';
     }
 
     function setStatus(msg) {
@@ -319,7 +322,7 @@
       currentRowIndex = res.rowIndex;
       const d = res.data;
       const currentStatus = d.status || '未確認';
-      
+
       setStatus(currentRowIndex + "行目 を確認中 （ステータス: " + currentStatus + "）");
 
       if (res.fileId) {

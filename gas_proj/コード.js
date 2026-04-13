@@ -15,7 +15,18 @@ function onOpen() {
 }
 
 function exportCsvHandler() {
-  ExportService.exportToCsv();
+  const html = HtmlService.createHtmlOutputFromFile('ExportDialog')
+    .setTitle('エクスポート対象の選択')
+    .setWidth(320)
+    .setHeight(420);
+  SpreadsheetApp.getUi().showModalDialog(html, 'エクスポート対象の選択');
+}
+
+/**
+ * ExportDialogからのエクスポート呼び出し
+ */
+function executeExportProcess(statuses) {
+  return ExportService.exportToCsvWithStatuses(statuses);
 }
 
 /**

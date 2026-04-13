@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+    .checkbox-group { margin: 15px 0 25px 0; }
+    label { display: block; margin-bottom: 8px; font-size: 14px; cursor: pointer; }
+    button { padding: 10px 20px; background-color: #1a73e8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; box-sizing: border-box; }
+    button:hover { background-color: #1557b0; }
+    button:disabled { background-color: #ccc; cursor: not-allowed; }
+    #message { margin-top: 15px; font-size: 13px; font-weight: bold; text-align: center; }
+  </style>
+</head>
+<body>
+  <div style="font-size: 15px; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 10px;">
+    エクスポート対象のステータスを選択
+  </div>
+
+  <div class="checkbox-group">
+    <label><input type="checkbox" id="status-unconfirmed" value="未確認"> 未確認</label>
+    <label><input type="checkbox" id="status-confirmed" value="確認済" checked> 確認済</label>
+    <label><input type="checkbox" id="status-downloaded" value="ダウンロード済み"> ダウンロード済み</label>
+  </div>
+
+  <button id="btn-export" onclick="execute()">エクスポート実行</button>
+  <div id="message"></div>
+  
+  <script>
+    function execute() {
+      const statuses = [];
+      if (document.getElementById('status-unconfirmed').checked) statuses.push('未確認');
+      if (document.getElementById('status-confirmed').checked) statuses.push('確認済');
+      if (document.getElementById('status-downloaded').checked) statuses.push('ダウンロード済み');
+      
+      const msgArea = document.getElementById('message');
+      
+      if (statuses.length === 0) {
+        msgArea.style.color = 'red';
+        msgArea.innerText = '1つ以上のステータスを選択してください。';
+        return;
+      }
+      
+      document.getElementById('btn-export').disabled = true;
+      msgArea.style.color = '#1a73e8';
+      msgArea.innerText = 'エクスポート準備中...しばらくお待ちください。';
+      
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.error) {
+             msgArea.style.color = 'red';
+             msgArea.innerText = res.error;
+             document.getElementById('btn-export').disabled = false;
+          } else {
+             // ダイアログ側はバックエンド呼び出し後のshowModalDialogで上書きされるため特に処理不要
+          }
+        })
+        .withFailureHandler(function(err) {
+          msgArea.style.color = 'red';
+          msgArea.innerText = 'エラー: ' + err.message;
+          document.getElementById('btn-export').disabled = false;
+        })
+        .executeExportProcess(statuses);
+    }
+  </script>
+</body>
+</html>

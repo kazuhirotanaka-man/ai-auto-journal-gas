@@ -4,9 +4,9 @@
 const ExportService = {
   
   /**
-   * メニューから呼び出され、設定に応じたCSVを出力する（Google Driveのルート等に保存）
+   * 選択されたステータスに応じてCSVを出力し、出力を完了したデータのステータスを「ダウンロード済み」にする
    */
-  exportToCsv: function() {
+  exportToCsvWithStatuses: function(statuses) {
     const config = ConfigService.getAllConfig();
     const software = config.accountingSoftware || "弥生会計";
     
@@ -16,21 +16,34 @@ const ExportService = {
     // データのある範囲を取得（ヘッダーを除く）
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) {
-      SpreadsheetApp.getUi().alert("エクスポート対象のデータがありません。");
-      return;
+      return { error: "エクスポート対象のデータがありません。" };
     }
     
-    // A2:J... までのデータを取得（不要なK列「要注意」, L列「ファイルID」は計算時に除外）
-    const dataRange = sheet.getRange(2, 1, lastRow - 1, 10);
+    // A2からM列(13列目)までのデータを取得
+    const dataRange = sheet.getRange(2, 1, lastRow - 1, 13);
     const dataList = dataRange.getValues();
     
+    let targetRows = [];
+    let rowIndicesToUpdate = [];
+    
+    dataList.forEach((row, index) => {
+      const status = row[12]; // M列
+      if (statuses.includes(status)) {
+        targetRows.push(row);
+        rowIndicesToUpdate.push(index + 2); // データ行は2行目から
+      }
+    });
+
+    if (targetRows.length === 0) {
+      return { error: "選択されたステータスに該当するデータがありません。" };
+    }
+
     let csvData = "";
     
     if (software === "弥生会計") {
-      csvData = this.buildYayoiCsv(dataList);
+      csvData = this.buildYayoiCsv(targetRows);
     } else {
-      SpreadsheetApp.getUi().alert(`会計ソフト「${software}」の出力形式は現在未対応です。`);
-      return;
+      return { error: `会計ソフト「${software}」の出力形式は現在未対応です。` };
     }
     
     // CSVファイルをDriveのルートに作成
@@ -38,6 +51,11 @@ const ExportService = {
     const blob = Utilities.newBlob("", "text/csv", fileName).setDataFromString(csvData, "Shift_JIS"); // 弥生会計は一般的にShift-JISが安全
     const file = DriveApp.createFile(blob);
     
+    // 出力対象となった行のステータスを一括で「ダウンロード済み」に変更
+    rowIndicesToUpdate.forEach(rowIdx => {
+      sheet.getRange(rowIdx, 13).setValue("ダウンロード済み");
+    });
+
     // ダイアログを表示してダウンロードリンクを提供
     const downloadUrl = `https://drive.google.com/uc?export=download&id=${file.getId()}`;
     const htmlOutput = HtmlService.createHtmlOutput(`
@@ -48,9 +66,10 @@ const ExportService = {
           ファイルをダウンロード
         </a>
       </div>
-    `).setWidth(350).setHeight(180);
+    `).setWidth(350).setHeight(270);
     
     SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'エクスポート完了');
+    return { success: true };
   },
   
   /**
