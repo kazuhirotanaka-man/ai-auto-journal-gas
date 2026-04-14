@@ -134,10 +134,10 @@ function reset() {
  * freee APIを呼び出すための汎用関数
  * @param {string} method HTTPメソッド (get, post, put, delete)
  * @param {string} urlPath エンドポイントのパス (例: '/api/1/companies')
- * @param {object} urlQuery URLクエリパラメータのオブジェクト (例: { company_id: 123 })
- * @param {object} body リクエストボディのオブジェクト
- * @param {boolean} multipart マルチパートフォームデータとして送信するかどうか
- * @return {object} APIからのレスポンスをパースしたJSONオブジェクト
+ * @param {object} [urlQuery] URLクエリパラメータのオブジェクト (例: { company_id: 123 })
+ * @param {object} [body] リクエストボディのオブジェクト
+ * @param {boolean} [multipart=false] マルチパートフォームデータとして送信するかどうか
+ * @return {object|null} APIからのレスポンスをパースしたJSONオブジェクト
  */
 function callFreeeApi(method, urlPath, urlQuery, body, multipart = false) {
   const freeeService = getFreeeService();
@@ -145,7 +145,7 @@ function callFreeeApi(method, urlPath, urlQuery, body, multipart = false) {
     throw new Error('認証が必要です。メニューから「認証」を実行してください。');
   }
 
-  let fullUrl = FREEE_API_BASE_URL + urlPath;
+  let fullUrl = FREEE_API_BASE_URL + (urlPath.startsWith('/') ? urlPath : '/' + urlPath);
 
   if (urlQuery) {
     const queryString = Object.keys(urlQuery)

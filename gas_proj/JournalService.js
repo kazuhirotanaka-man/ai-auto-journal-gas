@@ -4,15 +4,40 @@
 const JournalService = {
   
   /**
-   * 解析された仕訳データを「仕訳データ」シートの最下行に追記する
-   * @param {object} parsedData AIから返ってきたJSONオブジェクト
-   * @param {GoogleAppsScript.Drive.File} file 対象のファイルオブジェクト
+   * シートの「真の」最終行を取得する（空文字のみの行を無視する）
+   * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet 対象シート
+   * @returns {number} 最終行番号 (1-indexed)
    */
+  getActualLastRow: function(sheet) {
+    const rawLastRow = sheet.getLastRow();
+    if (rawLastRow <= 1) return 1;
+
+    // パフォーマンス低下を防ぐため、後ろから100行ずつバッチでチェックする
+    const maxCol = sheet.getLastColumn();
+    if (maxCol === 0) return 1;
+
+    let currentEndRow = rawLastRow;
+    
+    while (currentEndRow > 1) {
+      const startRow = Math.max(2, currentEndRow - 100 + 1);
+      const numRows = currentEndRow - startRow + 1;
+      const values = sheet.getRange(startRow, 1, numRows, maxCol).getValues();
+      
+      for (let i = values.length - 1; i >= 0; i--) {
+        if (values[i].join("").length > 0) {
+          return startRow + i;
+        }
+      }
+      currentEndRow = startRow - 1;
+    }
+    return 1;
+  },
+
   /**
    * 解析された仕訳データを対象のシートの最下行に追記する
    * @param {object} parsedData AIから返ってきたJSONオブジェクト
    * @param {GoogleAppsScript.Drive.File} file 対象のファイルオブジェクト
-   * @param {object} config 設定オブジェクト
+   * @param {object} [config] 設定オブジェクト(省略時は自動取得)
    */
   appendJournalEntry: function(parsedData, file, config) {
     if (!config) {
@@ -28,6 +53,9 @@ const JournalService = {
 
   /**
    * freee形式のデータを「freee取引データ」シートの最下行に追記する
+   * @param {object} parsedData AIから返ってきたJSONオブジェクト
+   * @param {GoogleAppsScript.Drive.File} file 対象のファイルオブジェクト
+   * @param {object} config 設定オブジェクト
    */
   appendFreeeJournalEntry: function(parsedData, file, config) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -42,15 +70,8 @@ const JournalService = {
       ]);
     }
     
-    // システム上の最終行を取得（特定の列に依存せず行全体を見て判定する）
-    const data = sheet.getDataRange().getValues();
-    let lastRow = 1;
-    for (let i = data.length - 1; i >= 0; i--) {
-      if (data[i].join("").length > 0) {
-        lastRow = i + 1;
-        break;
-      }
-    }
+    // システム上の最終行を取得（空文字のみの行を無視する）
+    const lastRow = this.getActualLastRow(sheet);
     const targetRowIndex = lastRow + 1;
 
     let isTarget = parsedData.isTarget !== false;
@@ -180,20 +201,16 @@ const JournalService = {
 
   /**
    * 弥生形式・汎用形式のデータを「仕訳データ」シートの最下行に追記する
+   * @param {object} parsedData AIから返ってきたJSONオブジェクト
+   * @param {GoogleAppsScript.Drive.File} file 対象のファイルオブジェクト
+   * @param {object} config 設定オブジェクト
    */
   appendYayoiJournalEntry: function(parsedData, file, config) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName("仕訳データ");
     
-    // システム上の最終行を取得（特定の列に依存せず行全体を見て判定する）
-    const data = sheet.getDataRange().getValues();
-    let lastRow = 1;
-    for (let i = data.length - 1; i >= 0; i--) {
-      if (data[i].join("").length > 0) {
-        lastRow = i + 1;
-        break;
-      }
-    }
+    // システム上の最終行を取得（空文字のみの行を無視する）
+    const lastRow = this.getActualLastRow(sheet);
     const targetRowIndex = lastRow + 1;
 
     let isTarget = parsedData.isTarget !== false;

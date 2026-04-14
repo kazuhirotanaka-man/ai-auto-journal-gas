@@ -1,57 +1,21 @@
 /**
- * Gemini APIと通信し、画像から仕訳情報を抽出するサービス
+ * freee形式のプロンプトを生成する
+ * @param {object} config 
+ * @param {string} fileNameInfo 
+ * @param {string} companyNameInfo 
+ * @param {string} businessContext 
+ * @returns {string} プロンプト文字列
  */
-const GeminiService = {
-
-  /**
-   * 画像ファイルと設定リストを元にGeminiに解析をリクエストする
-   * @param {GoogleAppsScript.Drive.File} file 
-   * @param {object} config 
-   * @returns {object} 解析結果 (JSON)
-   */
-  analyzeReceipt: function (file, config) {
-    const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-    if (!apiKey) {
-      throw new Error("Gemini APIキーが設定されていません。Script Properties (GEMINI_API_KEY) を確認してください。");
-    }
-
-    const mimeType = file.getMimeType();
-
-    // 対応していないファイル形式の場合は、API通信を行わずに「対象外」として返す
-    const validMimes = ["image/jpeg", "image/png", "application/pdf", "image/webp", "image/heic", "image/heif"];
-    if (!validMimes.includes(mimeType)) {
-      return {
-        isTarget: false,
-        entries: [{
-          description: "対象外（画像・PDF以外の形式は処理できません）",
-          debitTaxCategory: "対象外",
-          creditTaxCategory: "対象外"
-        }]
-      };
-    }
-
-    const bytes = file.getBlob().getBytes();
-    const base64Data = Utilities.base64Encode(bytes);
-
-    // ユーザー設定からプロンプトを構築
-    const fileNameInfo = `ファイル名: ${file.getName()}`;
-    const companyNameInfo = config.companyName ? `自社名（この会計データの主体）: ${config.companyName}\n※この自社名が発行元となっている請求書は「発行した請求書（売上など）」、宛先となっている場合は「受け取った請求書（経費など）」として区別してください。` : "";
-    const industryInfo = config.industryType ? `自社の業種（大分類）: ${config.industryType}` : "";
-    const businessInfo = config.businessDetails ? `具体的な事業内容: ${config.businessDetails}` : "";
-    const businessContext = (industryInfo || businessInfo) ? `${industryInfo ? industryInfo + "\\n" : ""}${businessInfo ? businessInfo + "\\n" : ""}※この業種・事業内容特有の経費科目や取引の性質を考慮して仕訳を推測してください。` : "";
-
-    let systemPrompt = "";
-
-    if (config.accountingSoftware === "freee会計") {
-      const accountsInfo = config.freeeAccountsList && config.freeeAccountsList.length > 0 ? `勘定科目の候補: [${config.freeeAccountsList.join(", ")}]` : "適切な勘定科目を推測してください。";
-      const taxCategoryInfo = config.freeeTaxCategoryList && config.freeeTaxCategoryList.length > 0 ? `税区分の候補: [${config.freeeTaxCategoryList.join(", ")}]` : "税区分は適切なものを推測するか空欄にしてください。";
-      const walletsInfo = config.freeeWalletsList && config.freeeWalletsList.length > 0 ? `決済口座の候補: [${config.freeeWalletsList.join(", ")}]` : "決済口座は適切なものを推測するか空欄にしてください。";
-      const partnersInfo = config.freeePartnersList && config.freeePartnersList.length > 0 ? `取引先の候補: [${config.freeePartnersList.join(", ")}]` : "取引先は証憑から読み取ってください。";
-      const itemsInfo = config.freeeItemsList && config.freeeItemsList.length > 0 ? `品目の候補: [${config.freeeItemsList.join(", ")}]` : "品目は空欄または証憑から読み取った一般的な名称にしてください。";
-      const deptsInfo = config.freeeDepartmentsList && config.freeeDepartmentsList.length > 0 ? `部門の候補: [${config.freeeDepartmentsList.join(", ")}]` : "部門は空欄にしてください。";
-      const tagsInfo = config.freeeTagsList && config.freeeTagsList.length > 0 ? `メモタグの候補: [${config.freeeTagsList.join(", ")}]` : "メモタグは空欄にしてください。";
-      
-      systemPrompt = `
+function generateFreeePrompt(config, fileNameInfo, companyNameInfo, businessContext) {
+  const accountsInfo = config.freeeAccountsList && config.freeeAccountsList.length > 0 ? `勘定科目の候補: [${config.freeeAccountsList.join(", ")}]` : "適切な勘定科目を推測してください。";
+  const taxCategoryInfo = config.freeeTaxCategoryList && config.freeeTaxCategoryList.length > 0 ? `税区分の候補: [${config.freeeTaxCategoryList.join(", ")}]` : "税区分は適切なものを推測するか空欄にしてください。";
+  const walletsInfo = config.freeeWalletsList && config.freeeWalletsList.length > 0 ? `決済口座の候補: [${config.freeeWalletsList.join(", ")}]` : "決済口座は適切なものを推測するか空欄にしてください。";
+  const partnersInfo = config.freeePartnersList && config.freeePartnersList.length > 0 ? `取引先の候補: [${config.freeePartnersList.join(", ")}]` : "取引先は証憑から読み取ってください。";
+  const itemsInfo = config.freeeItemsList && config.freeeItemsList.length > 0 ? `品目の候補: [${config.freeeItemsList.join(", ")}]` : "品目は空欄または証憑から読み取った一般的な名称にしてください。";
+  const deptsInfo = config.freeeDepartmentsList && config.freeeDepartmentsList.length > 0 ? `部門の候補: [${config.freeeDepartmentsList.join(", ")}]` : "部門は空欄にしてください。";
+  const tagsInfo = config.freeeTagsList && config.freeeTagsList.length > 0 ? `メモタグの候補: [${config.freeeTagsList.join(", ")}]` : "メモタグは空欄にしてください。";
+  
+  return `
 あなたはプロの会計事務所職員です。添付された証憑画像（領収書、請求書など）を解析し、freee会計向けの仕訳データを作成してください。
 以下のJSONフォーマットで回答してください。JSON以外のテキストは出力しないでください。
 
@@ -107,14 +71,23 @@ ${config.extraPrompt ? `追加の指針: ${config.extraPrompt}` : ""}
   ]
 }
 `;
-    } else {
-      // 弥生会計・その他の汎用モード
-      const accountsInfo = config.accountsList && config.accountsList.length > 0 ? `勘定科目の候補: [${config.accountsList.join(", ")}]` : "適切な勘定科目を推測してください。";
-      const subAccountsInfo = config.subAccountsList && config.subAccountsList.length > 0 ? `補助科目の候補: [${config.subAccountsList.join(", ")}]` : "補助科目は（明確に指定がない限り）空欄にしてください。";
-      const taxCategoryInfo = config.taxCategoryList && config.taxCategoryList.length > 0 ? `税区分の候補: [${config.taxCategoryList.join(", ")}]` : "税区分は適切なものを推測するか空欄にしてください。";
-      const extraPromptInfo = config.extraPrompt ? `追加の指針: ${config.extraPrompt}` : "";
+}
 
-      systemPrompt = `
+/**
+ * 弥生形式・汎用形式のプロンプトを生成する
+ * @param {object} config 
+ * @param {string} fileNameInfo 
+ * @param {string} companyNameInfo 
+ * @param {string} businessContext 
+ * @returns {string} プロンプト文字列
+ */
+function generateYayoiPrompt(config, fileNameInfo, companyNameInfo, businessContext) {
+  const accountsInfo = config.accountsList && config.accountsList.length > 0 ? `勘定科目の候補: [${config.accountsList.join(", ")}]` : "適切な勘定科目を推測してください。";
+  const subAccountsInfo = config.subAccountsList && config.subAccountsList.length > 0 ? `補助科目の候補: [${config.subAccountsList.join(", ")}]` : "補助科目は（明確に指定がない限り）空欄にしてください。";
+  const taxCategoryInfo = config.taxCategoryList && config.taxCategoryList.length > 0 ? `税区分の候補: [${config.taxCategoryList.join(", ")}]` : "税区分は適切なものを推測するか空欄にしてください。";
+  const extraPromptInfo = config.extraPrompt ? `追加の指針: ${config.extraPrompt}` : "";
+
+  return `
 あなたはプロの会計事務所職員です。添付された証憑画像（領収書、請求書など）を解析し、仕訳データを作成してください。
 以下のJSONフォーマットで回答してください。JSON以外のテキストは出力しないでください。
 
@@ -155,7 +128,53 @@ ${businessContext}
   ]
 }
 `;
+}
+
+/**
+ * Gemini APIと通信し、画像から仕訳情報を抽出するサービス
+ */
+const GeminiService = {
+
+  /**
+   * 画像ファイルと設定リストを元にGeminiに解析をリクエストする
+   * @param {GoogleAppsScript.Drive.File} file 対象のファイルオブジェクト
+   * @param {object} config 設定オブジェクト
+   * @returns {object} 解析結果 (JSON)
+   */
+  analyzeReceipt: function (file, config) {
+    const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
+    if (!apiKey) {
+      throw new Error("Gemini APIキーが設定されていません。Script Properties (GEMINI_API_KEY) を確認してください。");
     }
+
+    const mimeType = file.getMimeType();
+
+    // 対応していないファイル形式の場合は、API通信を行わずに「対象外」として返す
+    const validMimes = ["image/jpeg", "image/png", "application/pdf", "image/webp", "image/heic", "image/heif"];
+    if (!validMimes.includes(mimeType)) {
+      return {
+        isTarget: false,
+        entries: [{
+          description: "対象外（画像・PDF以外の形式は処理できません）",
+          debitTaxCategory: "対象外",
+          creditTaxCategory: "対象外"
+        }]
+      };
+    }
+
+    const bytes = file.getBlob().getBytes();
+    const base64Data = Utilities.base64Encode(bytes);
+
+    // ユーザー設定からプロンプトを構築
+    const fileNameInfo = `ファイル名: ${file.getName()}`;
+    const companyNameInfo = config.companyName ? `自社名（この会計データの主体）: ${config.companyName}\n※この自社名が発行元となっている請求書は「発行した請求書（売上など）」、宛先となっている場合は「受け取った請求書（経費など）」として区別してください。` : "";
+    const industryInfo = config.industryType ? `自社の業種（大分類）: ${config.industryType}` : "";
+    const businessInfo = config.businessDetails ? `具体的な事業内容: ${config.businessDetails}` : "";
+    const businessContext = (industryInfo || businessInfo) ? `${industryInfo ? industryInfo + "\\n" : ""}${businessInfo ? businessInfo + "\\n" : ""}※この業種・事業内容特有の経費科目や取引の性質を考慮して仕訳を推測してください。` : "";
+
+    let systemPrompt = config.accountingSoftware === "freee会計"
+      ? generateFreeePrompt(config, fileNameInfo, companyNameInfo, businessContext)
+      : generateYayoiPrompt(config, fileNameInfo, companyNameInfo, businessContext);
 
     // Gemini 2.0 Flash Lite (ご指定の Flash Lite を使用)
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`;
