@@ -20,6 +20,20 @@ function fetchFreeeMasters() {
     return;
   }
 
+  try {
+    syncFreeeMastersCore(companyId);
+    ui.alert('完了', 'すべてのマスタの取得とシートへの書き出しが完了しました。', ui.ButtonSet.OK);
+  } catch (e) {
+    Logger.log('マスタ取得エラー: ' + e.message);
+    ui.alert('エラー', 'マスタ情報の取得中にエラーが発生しました。\n' + e.message, ui.ButtonSet.OK);
+  }
+}
+
+/**
+ * freeeから各種マスタデータを取得し、指定されたシートに書き出す機能（コア処理）
+ * @param {string} companyId 
+ */
+function syncFreeeMastersCore(companyId) {
   // 取得中はUIがブロックされるため、Toastで通知（可能であれば）
   try {
     SpreadsheetApp.getActiveSpreadsheet().toast('マスタ取得を開始しました。完了するまでお待ちください...', '処理中', -1);
@@ -27,19 +41,18 @@ function fetchFreeeMasters() {
     // UIがないなどで失敗した場合は無視
   }
 
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    let currentStepNum = 0;
-    const totalSteps = 7;
-    let currentItemName = '';
+  let currentStepNum = 0;
+  const totalSteps = 7;
+  let currentItemName = '';
 
-    const updateToast = () => {
-      try {
-        ss.toast(`現在: ${currentItemName} を取得しています...`, `マスタ取得状況 ( ${currentStepNum} / ${totalSteps} )`, 60);
-        SpreadsheetApp.flush();
-      } catch (e) {}
-    };
+  const updateToast = () => {
+    try {
+      ss.toast(`現在: ${currentItemName} を取得しています...`, `マスタ取得状況 ( ${currentStepNum} / ${totalSteps} )`, 60);
+      SpreadsheetApp.flush();
+    } catch (e) {}
+  };
 
     // 取得時の共通パラメータ (可能な限り多くの件数を一度に取得するため limit: 3000 を設定)
     const queryParams = { company_id: companyId, limit: 3000 };
@@ -133,13 +146,6 @@ function fetchFreeeMasters() {
       ss.toast('すべてのマスタ情報の取得・シート反映が完了しました。', '完了', 5);
       ConfigService.clearCache(); // マスタ更新によりキャッシュをクリアする
     } catch (e) {}
-
-    ui.alert('完了', 'すべてのマスタの取得とシートへの書き出しが完了しました。', ui.ButtonSet.OK);
-
-  } catch (e) {
-    Logger.log('マスタ取得エラー: ' + e.message);
-    ui.alert('エラー', 'マスタ情報の取得中にエラーが発生しました。\n' + e.message, ui.ButtonSet.OK);
-  }
 }
 
 /**

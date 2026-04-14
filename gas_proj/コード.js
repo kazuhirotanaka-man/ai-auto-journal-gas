@@ -35,6 +35,7 @@ function onOpen() {
     .addItem('🪟 プレビューをポップアップ（大画面）で開く', 'showDialog')
     .addSeparator()
     .addItem('💾 会計ソフト形式でエクスポート', 'exportCsvHandler')
+    .addItem('☁️ freee会計に取引登録', 'exportFreeeHandler')
     .addToUi();
 
   // freee連携メニュー
@@ -58,6 +59,14 @@ function exportCsvHandler() {
     .setWidth(320)
     .setHeight(420);
   SpreadsheetApp.getUi().showModalDialog(html, 'エクスポート対象の選択');
+}
+
+function exportFreeeHandler() {
+  const html = HtmlService.createHtmlOutputFromFile('freee_ExportDialog')
+    .setTitle('freee会計へ取引登録')
+    .setWidth(320)
+    .setHeight(420);
+  SpreadsheetApp.getUi().showModalDialog(html, 'freee会計へ取引登録');
 }
 
 /**

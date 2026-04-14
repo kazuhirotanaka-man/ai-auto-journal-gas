@@ -24,7 +24,7 @@ function getCompanies() {
 
     const companies = result.companies;
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("事業所一覧") || SpreadsheetApp.getActiveSpreadsheet().insertSheet("事業所一覧");
-    sheet.clear(); 
+    sheet.clear();
 
     // シートへの書き出し
     const headers = ['事業所ID', '表示名', '事業所名', '事業所名カナ', '事業所番号', 'ロール'];
@@ -68,7 +68,7 @@ function runDealLifecycleSample() {
 
     // --- ① 取引の登録（POST）---
     Logger.log('--- ① 取引の登録（POST）---');
-    
+
     // 取引登録に必要な情報をAPIから動的に取得
     Logger.log('取引登録に必要な情報をAPIから取得します...');
     const accountItemsRes = callFreeeApi('get', '/api/1/account_items', { company_id: companyId }, null);
@@ -124,4 +124,209 @@ function runDealLifecycleSample() {
     Logger.log('エラーが発生しました: ' + e.message);
     ui.alert('エラーが発生しました: ' + e.message);
   }
+}
+
+/**
+ * マスタシートから名前で検索して値を取得する
+ */
+function getFreeeMasterValueByName(sheetName, name, returnColIndex = 0, searchColIndex = 1) {
+  if (!name) return null;
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return null;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  const maxCol = Math.max(returnColIndex, searchColIndex) + 1;
+  const values = sheet.getRange(2, 1, lastRow - 1, maxCol).getValues();
+
+  for (let i = 0; i < values.length; i++) {
+    if (values[i][searchColIndex] == name) {
+      return values[i][returnColIndex];
+    }
+  }
+  return null;
+}
+
+/**
+ * freee_ExportDialogからの呼び出し：取引の登録を実行
+ * @param {string[]} statuses 処理対象のステータス
+ */
+function executeFreeeExportProcess(statuses) {
+  const ui = getSafeUi();
+  const companyId = getSelectedCompanyId();
+  if (!companyId) return { error: "事業所が選択されていません。" };
+
+  // 1. 事前にマスタを更新する
+  try {
+    syncFreeeMastersCore(companyId);
+  } catch (e) {
+    return { error: "マスタ更新に失敗しました: " + e.message };
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('freee取引データ');
+  if (!sheet) return { error: "「freee取引データ」シートが見つかりません。" };
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    ui.alert("出力対象のデータがありません。");
+    return;
+  }
+
+  // A列～T列まで取得する (T列のインデックスは19)
+  const MAX_COL = 20;
+  const RESULT_COL_INDEX = 19;
+
+  const range = sheet.getRange(2, 1, lastRow - 1, MAX_COL);
+  const values = range.getValues();
+
+  // 取引ごとにまとめる処理
+  let transactions = [];
+  let currentTx = null;
+
+  for (let i = 0; i < values.length; i++) {
+    const row = values[i];
+    const isHead = (row[FREEE_COL.INCOME_EXPENSE] !== "");
+
+    if (isHead) {
+      if (currentTx) {
+        transactions.push(currentTx);
+      }
+      currentTx = {
+        rowIndex: i, // 0-indexed values array matching
+        head: row,
+        details: [row], // First detail is the head row itself for detail cols
+        detailRowIndices: [i]
+      };
+    } else {
+      if (currentTx) {
+        currentTx.details.push(row);
+        currentTx.detailRowIndices.push(i);
+      }
+    }
+  }
+  if (currentTx) transactions.push(currentTx);
+
+  let successCount = 0;
+  let errorCount = 0;
+
+  SpreadsheetApp.getActiveSpreadsheet().toast('対象の取引を登録しています...', '処理中', -1);
+
+  for (const tx of transactions) {
+    const head = tx.head;
+    const status = head[FREEE_COL.STATUS];
+
+    // 指定されたステータス以外は無視
+    if (!statuses.includes(status)) continue;
+
+    // ペイロード構築
+    try {
+      const typeStr = head[FREEE_COL.INCOME_EXPENSE];
+      let dealType = "";
+      if (typeStr === "収入") dealType = "income";
+      else if (typeStr === "支出") dealType = "expense";
+      else throw new Error("収支には「収入」または「支出」を指定してください。");
+
+      const issueDate = formatRawDate(head[FREEE_COL.ACCRUAL_DATE]) || formatRawDate(new Date());
+
+      const partnerName = head[FREEE_COL.PARTNER];
+      const partnerId = partnerName ? getFreeeMasterValueByName('マスタfreee取引先', partnerName, 0, 1) : undefined;
+      const refNumber = head[FREEE_COL.REG_NUM] || undefined;
+
+      let detailsPayload = [];
+      for (const row of tx.details) {
+        const taxName = row[FREEE_COL.TAX];
+        const taxCode = taxName ? getFreeeMasterValueByName('マスタfreee税区分', taxName, 0, 1) : undefined;
+        if (taxCode === null || taxCode === undefined) throw new Error(`税区分「${taxName}」が見つかりませんでした。`);
+
+        const accountName = row[FREEE_COL.ACC_ITEM];
+        const accountId = accountName ? getFreeeMasterValueByName('マスタfreee勘定科目', accountName, 0, 1) : undefined;
+        if (!accountId) throw new Error(`勘定科目「${accountName}」が見つかりませんでした。`);
+
+        const itemName = row[FREEE_COL.ITEM];
+        const itemId = itemName ? getFreeeMasterValueByName('マスタfreee品目', itemName, 0, 1) : undefined;
+
+        const deptName = row[FREEE_COL.DEPT];
+        const deptId = deptName ? getFreeeMasterValueByName('マスタfreee部門', deptName, 0, 1) : undefined;
+
+        const tagName = row[FREEE_COL.TAG];
+        const tagId = tagName ? getFreeeMasterValueByName('マスタfreeeメモタグ', tagName, 0, 1) : undefined;
+
+        let amount = row[FREEE_COL.AMOUNT];
+        if (amount === "" || amount == null) amount = 0;
+
+        const detail = {
+          tax_code: taxCode,
+          account_item_id: accountId,
+          amount: parseInt(amount, 10)
+        };
+        if (itemId) detail.item_id = itemId;
+        if (deptId) detail.section_id = deptId;
+        if (tagId) detail.tag_ids = [tagId];
+
+
+        const description = row[FREEE_COL.DESC];
+        if (description) detail.description = description;
+
+        detailsPayload.push(detail);
+      }
+
+      const dealBody = {
+        company_id: companyId,
+        issue_date: issueDate,
+        type: dealType,
+        details: detailsPayload
+      };
+
+      if (refNumber) {
+        dealBody.ref_number = String(refNumber);
+      }
+
+      // 支払行の追加
+      const payStatus = head[FREEE_COL.PAY_STATUS];
+      if (payStatus === "決済済") {
+        const walletName = head[FREEE_COL.WALLET];
+        const walletId = walletName ? getFreeeMasterValueByName('マスタfreee口座', walletName, 0, 1) : undefined;
+        const walletType = walletName ? getFreeeMasterValueByName('マスタfreee口座', walletName, 2, 1) : undefined;
+
+        const payDate = formatRawDate(head[FREEE_COL.PAY_DATE]) || issueDate;
+
+        let totalAmount = 0;
+        for (const pd of detailsPayload) totalAmount += pd.amount;
+
+        if (walletId && walletType) {
+          dealBody.payments = [{
+            amount: totalAmount,
+            date: payDate,
+            from_walletable_id: walletId,
+            from_walletable_type: walletType
+          }];
+        }
+      }
+
+      // APIによる登録
+      const createdDeal = callFreeeApi('post', '/api/1/deals', null, dealBody);
+      const dealId = createdDeal.deal.id;
+
+      // 書き戻し
+      for (const rIndex of tx.detailRowIndices) {
+        values[rIndex][RESULT_COL_INDEX] = dealId; // freee登録結果
+        values[rIndex][FREEE_COL.STATUS] = '登録済';
+      }
+
+      successCount++;
+    } catch (err) {
+      for (const rIndex of tx.detailRowIndices) {
+        values[rIndex][RESULT_COL_INDEX] = "エラー: " + err.message;
+      }
+      errorCount++;
+    }
+  }
+
+  // シートの更新
+  range.setValues(values);
+
+  SpreadsheetApp.getActiveSpreadsheet().toast(`登録完了 成功: ${successCount} 件, 失敗: ${errorCount} 件`, '完了', 5);
+  ui.alert(`登録処理が完了しました。\n成功: ${successCount} 件\n失敗: ${errorCount} 件`);
 }
