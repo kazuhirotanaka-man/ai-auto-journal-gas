@@ -81,7 +81,7 @@
       display: flex;
       flex-direction: row;
       gap: 8px;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
       z-index: 10;
     }
 
@@ -152,6 +152,32 @@
 
     .btn-danger:hover {
       background: #c5221f;
+    }
+
+    .btn-add-detail {
+      background: #fff;
+      color: #1a73e8;
+      border: 1px solid #1a73e8;
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      font-size: 18px;
+      line-height: 24px;
+      padding: 0;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-add-detail:hover {
+      background: #f0f4f8;
+    }
+
+    .btn-add-detail:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .header-info-row {
@@ -315,7 +341,7 @@
     function populateSelect(selectId, list, currentValue, showNoValueOption = true) {
       const sel = document.getElementById(selectId);
       if (sel.tagName !== 'SELECT') return;
-      
+
       // if it has predefined options (like incomeExpense), just set value
       if (selectId === 'ui-incomeExpense' || selectId === 'ui-paymentStatus') {
         sel.value = currentValue || '';
@@ -377,17 +403,17 @@
       document.getElementById('warning-text').innerText = (t.warningText ? "AI推測確度: " + t.warningText : "") + aiGuessText;
 
       document.getElementById('ui-status').value = currentStatus;
-      
+
       populateSelect('ui-incomeExpense', null, t.incomeExpense);
       document.getElementById('ui-date').value = t.date || '';
-      
+
       populateSelect('ui-partner', res.freeePartnersList, t.partner);
       document.getElementById('ui-registrationNumber').value = t.registrationNumber || '';
-      
+
       populateSelect('ui-paymentStatus', null, t.paymentStatus);
       document.getElementById('ui-paymentDate').value = t.paymentDate || '';
       populateSelect('ui-wallet', res.freeeWalletsList, t.wallet);
-      
+
       togglePaymentFields(); // 状態に応じたフィールド非活性化の初期適用
 
       const container = document.getElementById('details-container');
@@ -434,6 +460,9 @@
               <textarea id="ui-description-${idx}" rows="2">${d.description || ''}</textarea>
             </div>
           </div>
+          <div style="text-align: center; margin-top: -12px; margin-bottom: 12px; position: relative; z-index: 1;">
+            <button class="btn-add-detail" title="明細追加" onclick="doAddDetail(${idx}, this)">＋</button>
+          </div>
         `;
         container.insertAdjacentHTML('beforeend', html);
 
@@ -466,12 +495,12 @@
       if (!confirm(`明細情報 ${idx + 1} を削除しますか？\n（※1行しかない場合は、取引ごと削除されます）`)) {
         return;
       }
-      
+
       isProcessing = true;
       setStatus(`明細情報 ${idx + 1} をシートから削除中...`);
       document.querySelectorAll('.buttons button, .btn-danger').forEach(b => b.disabled = true);
       btn.innerHTML = '<div class="spinner"></div>';
-      
+
       google.script.run
         .withSuccessHandler(function (res) {
           onDataLoaded(res);
@@ -485,6 +514,82 @@
           document.querySelectorAll('.btn-danger').forEach(b => b.disabled = false);
         })
         .deleteFreeeDetailRow(currentRowIndex, idx);
+    }
+
+    function doAddDetail(idx, btn) {
+      if (isProcessing) return;
+      isProcessing = true;
+      setStatus(`行を追加中...`);
+      document.querySelectorAll('.buttons button, .btn-danger, .btn-add-detail').forEach(b => b.disabled = true);
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<div class="spinner" style="width: 14px; height: 14px; border-width: 2px;"></div>';
+
+      // 今のUIの入力内容を退避
+      let parentInputs = {
+        incomeExpense: document.getElementById('ui-incomeExpense').value,
+        date: document.getElementById('ui-date').value,
+        partner: document.getElementById('ui-partner').value,
+        registrationNumber: document.getElementById('ui-registrationNumber').value,
+        paymentStatus: document.getElementById('ui-paymentStatus').value,
+        paymentDate: document.getElementById('ui-paymentDate').value,
+        wallet: document.getElementById('ui-wallet').value,
+        status: document.getElementById('ui-status').value
+      };
+
+      let currentInputs = [];
+      document.querySelectorAll('.detail-block').forEach((block) => {
+        let i = block.getAttribute('data-index');
+        currentInputs.push({
+          accountItem: document.getElementById(`ui-accountItem-${i}`).value,
+          amount: document.getElementById(`ui-amount-${i}`).value,
+          taxCategory: document.getElementById(`ui-taxCategory-${i}`).value,
+          item: document.getElementById(`ui-item-${i}`).value,
+          department: document.getElementById(`ui-department-${i}`).value,
+          memoTag: document.getElementById(`ui-memoTag-${i}`).value,
+          description: document.getElementById(`ui-description-${i}`).value
+        });
+      });
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          onDataLoaded(res);
+          // 入力内容を復元 (今回追加された行 idx の後ろに空データとなるようcurrentInputsに空オブジェクトを挿入)
+          currentInputs.splice(idx + 1, 0, {});
+
+          document.getElementById('ui-status').value = parentInputs.status;
+          document.getElementById('ui-incomeExpense').value = parentInputs.incomeExpense;
+          document.getElementById('ui-date').value = parentInputs.date;
+          document.getElementById('ui-partner').value = parentInputs.partner;
+          document.getElementById('ui-registrationNumber').value = parentInputs.registrationNumber;
+          document.getElementById('ui-paymentStatus').value = parentInputs.paymentStatus;
+          document.getElementById('ui-paymentDate').value = parentInputs.paymentDate;
+          document.getElementById('ui-wallet').value = parentInputs.wallet;
+          togglePaymentFields();
+
+          document.querySelectorAll('.detail-block').forEach((block) => {
+            let i = parseInt(block.getAttribute('data-index'), 10);
+            if (currentInputs[i]) {
+              if (currentInputs[i].accountItem !== undefined) document.getElementById(`ui-accountItem-${i}`).value = currentInputs[i].accountItem;
+              if (currentInputs[i].amount !== undefined) document.getElementById(`ui-amount-${i}`).value = currentInputs[i].amount;
+              if (currentInputs[i].taxCategory !== undefined) document.getElementById(`ui-taxCategory-${i}`).value = currentInputs[i].taxCategory;
+              if (currentInputs[i].item !== undefined) document.getElementById(`ui-item-${i}`).value = currentInputs[i].item;
+              if (currentInputs[i].department !== undefined) document.getElementById(`ui-department-${i}`).value = currentInputs[i].department;
+              if (currentInputs[i].memoTag !== undefined) document.getElementById(`ui-memoTag-${i}`).value = currentInputs[i].memoTag;
+              if (currentInputs[i].description !== undefined) document.getElementById(`ui-description-${i}`).value = currentInputs[i].description;
+            }
+          });
+
+          setStatus("明細行を追加しました。");
+          isProcessing = false;
+        })
+        .withFailureHandler(function (err) {
+          setStatus("エラー: " + err.message);
+          isProcessing = false;
+          resetButtons();
+          btn.innerHTML = originalText;
+          document.querySelectorAll('.btn-add-detail, .btn-danger').forEach(b => b.disabled = false);
+        })
+        .insertFreeeDetailRow(currentRowIndex, idx);
     }
 
     function doAction(action, btnTarget) {
@@ -538,7 +643,7 @@
         // 空のオブジェクトを配列の要素数だけ入れることで、送受信時のシリアライズエラーを防止
         let dummyDetails = [];
         for (let i = 0; i < (numDetails || 1); i++) dummyDetails.push({});
-        
+
         updateData = {
           details: dummyDetails
         };

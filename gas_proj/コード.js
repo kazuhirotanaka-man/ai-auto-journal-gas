@@ -518,6 +518,31 @@ function deleteFreeeDetailRow(rowIndex, detailIndex) {
 }
 
 /**
+ * freeeモードでの明細行プレビュー追加
+ * @param {number} rowIndex 取引の先頭行
+ * @param {number} detailIndex 追加元となる明細のインデックス(0から)
+ * @returns {object|null} 再読み込みした行データ
+ */
+function insertFreeeDetailRow(rowIndex, detailIndex) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('freee取引データ');
+  const targetRow = rowIndex + detailIndex;
+
+  sheet.insertRowAfter(targetRow);
+
+  // 追加元の明細行の背景色を引き継ぐ (任意)
+  try {
+    const bg = sheet.getRange(targetRow, 1, 1, 19).getBackgrounds()[0];
+    sheet.getRange(targetRow + 1, 1, 1, 19).setBackgrounds([bg]);
+  } catch (e) {
+    // 無視
+  }
+
+  // rowIndexの行を選択しておく
+  sheet.getRange(rowIndex, 1).activate();
+  return getPopupData(rowIndex);
+}
+
+/**
  * シートが手動編集されたときの自動トリガー
  * @param {GoogleAppsScript.Events.SheetsOnEdit} e
  */
