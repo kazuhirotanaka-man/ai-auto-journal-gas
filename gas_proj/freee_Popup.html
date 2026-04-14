@@ -309,6 +309,13 @@
       const btnExclude = document.getElementById('btn-exclude');
       const btnBack = document.getElementById('btn-back');
       const btnSkip = document.getElementById('btn-skip');
+
+      const statusElement = document.getElementById('ui-status');
+      if (statusElement && statusElement.value === '登録済') {
+        if (btnSave) btnSave.disabled = true;
+        if (btnExclude) btnExclude.disabled = true;
+      }
+
       if (btnSave) btnSave.innerText = '確認済にして次へ▶';
       if (btnExclude) btnExclude.innerText = '対象外にして次へ▶';
       if (btnBack) btnBack.innerText = '◀前に戻る';
@@ -375,7 +382,6 @@
     }
 
     function onDataLoaded(res) {
-      resetButtons();
       if (!res) {
         setStatus("データが見つかりません。最後の行に到達したか、シートにデータがありません。");
         document.getElementById('preview-frame').src = "";
@@ -403,6 +409,7 @@
       document.getElementById('warning-text').innerText = (t.warningText ? "AI推測確度: " + t.warningText : "") + aiGuessText;
 
       document.getElementById('ui-status').value = currentStatus;
+      resetButtons();
 
       populateSelect('ui-incomeExpense', null, t.incomeExpense);
       document.getElementById('ui-date').value = t.date || '';
@@ -602,6 +609,43 @@
       document.querySelectorAll('.buttons button').forEach(b => b.disabled = true);
       if (btnTarget) {
         btnTarget.innerHTML = '<div class="spinner"></div>';
+      }
+
+      if (action === 'save') {
+        let invalidFields = [];
+        const checkSelect = (id, label) => {
+           const sel = document.getElementById(id);
+           if (!sel) return;
+           if (sel.selectedIndex >= 0) {
+              const opt = sel.options[sel.selectedIndex];
+              if (opt && opt.text.includes('(未登録)')) {
+                  invalidFields.push(label);
+              }
+           }
+        };
+
+        checkSelect('ui-partner', '取引先');
+        if (document.getElementById('ui-paymentStatus').value === '決済済') {
+           checkSelect('ui-wallet', '決済口座');
+        }
+
+        document.querySelectorAll('.detail-block').forEach((block) => {
+           let idx = block.getAttribute('data-index');
+           let displayIdx = parseInt(idx, 10) + 1;
+           checkSelect(`ui-accountItem-${idx}`, `明細${displayIdx}の勘定科目`);
+           checkSelect(`ui-taxCategory-${idx}`, `明細${displayIdx}の税区分`);
+           checkSelect(`ui-item-${idx}`, `明細${displayIdx}の品目`);
+           checkSelect(`ui-department-${idx}`, `明細${displayIdx}の部門`);
+           checkSelect(`ui-memoTag-${idx}`, `明細${displayIdx}のメモタグ`);
+        });
+
+        if (invalidFields.length > 0) {
+           alert('【入力エラー】\n以下の項目が（未登録）のままです。プルダウンから正しい選択肢を選び直してください。\n\n・' + invalidFields.join('\n・'));
+           isProcessing = false;
+           setStatus("入力エラーがあります");
+           resetButtons();
+           return;
+        }
       }
 
       let updateData = null;

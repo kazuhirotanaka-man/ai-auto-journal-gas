@@ -12,23 +12,24 @@ const DriveServiceObj = {
     if (!folderId) throw new Error("フォルダIDが指定されていません。設定シートを確認してください。");
     const folder = DriveApp.getFolderById(folderId);
     let allFiles = [];
-    this._getImagesRecursively(folder, allFiles);
+    this._getImagesRecursively(folder, folder.getName(), allFiles);
     return allFiles;
   },
 
-  _getImagesRecursively: function(folder, filesArray) {
+  _getImagesRecursively: function(folder, currentPath, filesArray) {
     // 現在のフォルダ内のすべてのファイルを取得
     const files = folder.getFiles();
     while (files.hasNext()) {
       const file = files.next();
-      filesArray.push(file);
+      filesArray.push({ file: file, relativePath: currentPath });
     }
 
     // サブフォルダを再帰的に検索
     const subFolders = folder.getFolders();
     while (subFolders.hasNext()) {
       const subFolder = subFolders.next();
-      this._getImagesRecursively(subFolder, filesArray);
+      const nextPath = currentPath ? currentPath + "/" + subFolder.getName() : subFolder.getName();
+      this._getImagesRecursively(subFolder, nextPath, filesArray);
     }
   },
 
@@ -48,13 +49,13 @@ const DriveServiceObj = {
   /**
    * 未処理のファイルだけを抽出する
    * @param {string} folderId 
-   * @returns {GoogleAppsScript.Drive.File[]} 未処理のファイル配列
+   * @returns {Array<{file: GoogleAppsScript.Drive.File, relativePath: string}>} 未処理のファイル情報配列
    */
   getUnprocessedFiles: function(folderId) {
     const processedIds = this.getProcessedFileIds();
     const allFiles = this.getAllImageFiles(folderId);
     
     // システムログに存在しないファイルIDのみフィルタリング
-    return allFiles.filter(file => !processedIds.includes(file.getId()));
+    return allFiles.filter(item => !processedIds.includes(item.file.getId()));
   }
 };

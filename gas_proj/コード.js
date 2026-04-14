@@ -183,11 +183,13 @@ function processNewReceipts() {
   let errorCount = 0;
 
   for (let i = 0; i < unprocessedFiles.length; i++) {
-    const file = unprocessedFiles[i];
+    const item = unprocessedFiles[i];
+    const file = item.file;
+    const relativePath = item.relativePath;
 
     try {
       // Geminiで解析
-      const parsedData = GeminiService.analyzeReceipt(file, config);
+      const parsedData = GeminiService.analyzeReceipt(file, config, relativePath);
 
       // シートに追記
       JournalService.appendJournalEntry(parsedData, file, config);

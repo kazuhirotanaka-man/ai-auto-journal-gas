@@ -139,9 +139,10 @@ const GeminiService = {
    * 画像ファイルと設定リストを元にGeminiに解析をリクエストする
    * @param {GoogleAppsScript.Drive.File} file 対象のファイルオブジェクト
    * @param {object} config 設定オブジェクト
+   * @param {string} [relativePath] フォルダ名（トップからの相対パス）
    * @returns {object} 解析結果 (JSON)
    */
-  analyzeReceipt: function (file, config) {
+  analyzeReceipt: function (file, config, relativePath) {
     const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
     if (!apiKey) {
       throw new Error("Gemini APIキーが設定されていません。Script Properties (GEMINI_API_KEY) を確認してください。");
@@ -166,7 +167,10 @@ const GeminiService = {
     const base64Data = Utilities.base64Encode(bytes);
 
     // ユーザー設定からプロンプトを構築
-    const fileNameInfo = `ファイル名: ${file.getName()}`;
+    let fileNameInfo = `ファイル名: ${file.getName()}`;
+    if (relativePath) {
+      fileNameInfo += `\nフォルダ名（トップからの相対パス）: ${relativePath}`;
+    }
     const companyNameInfo = config.companyName ? `自社名（この会計データの主体）: ${config.companyName}\n※この自社名が発行元となっている請求書は「発行した請求書（売上など）」、宛先となっている場合は「受け取った請求書（経費など）」として区別してください。` : "";
     const industryInfo = config.industryType ? `自社の業種（大分類）: ${config.industryType}` : "";
     const businessInfo = config.businessDetails ? `具体的な事業内容: ${config.businessDetails}` : "";
