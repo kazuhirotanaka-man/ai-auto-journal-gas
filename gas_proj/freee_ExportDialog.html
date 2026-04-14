@@ -51,9 +51,16 @@
              msgArea.style.color = 'red';
              msgArea.innerText = res.error;
              document.getElementById('btn-export').disabled = false;
+          } else if (res && res.success) {
+             let msgHtml = `処理が完了しました。<br>成功: ${res.successCount} 件, 失敗: ${res.errorCount} 件<br>`;
+             if (res.attachmentErrorCount > 0) {
+                 msgHtml += `<span style="color:red; font-weight:bold;">※${res.attachmentErrorCount}件のファイル添付に失敗しました。<br>取引自体は作成されています。</span><br>`;
+             }
+             msgHtml += '枠外をクリックして閉じてください。';
+             msgArea.style.color = '#333';
+             msgArea.innerHTML = msgHtml;
+             document.getElementById('btn-export').disabled = false;
           } else {
-             // ダイアログ側はバックエンド呼び出し後のshowModalDialog等で上書きされるため特に処理不要
-             // ただし完了時はメッセージも出す
              msgArea.style.color = 'green';
              msgArea.innerText = '処理が完了しました。枠外をクリックして閉じてください。';
              document.getElementById('btn-export').disabled = false;
