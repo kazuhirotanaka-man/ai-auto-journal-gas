@@ -154,6 +154,31 @@ const LicenseService = {
   },
 
   /**
+   * API通信でキーの状態だけを事前確認する
+   */
+  _fetchKeyStatus: function(licenseKey) {
+    if (!licenseKey) return { success: false };
+    const rootId = this.getDriveRootId();
+    const payload = { action: 'check_status', licenseKey: licenseKey, rootId: rootId };
+    const options = {
+      method: "post",
+      payload: JSON.stringify(payload),
+      contentType: "application/json",
+      muteHttpExceptions: true
+    };
+    try {
+      const response = UrlFetchApp.fetch(this.API_ENDPOINT, options);
+      const result = JSON.parse(response.getContentText());
+      if (result.status === 'success') {
+        return { success: true, keyStatus: result.keyStatus };
+      }
+      return { success: false, message: result.message };
+    } catch (e) {
+      return { success: false, message: e.message };
+    }
+  },
+
+  /**
    * 実際の認証要求とUIを伴うフロー
    * ツールの起動時や実行時に呼び出される。
    * @returns {boolean} 最終的に認証されていれば true
@@ -162,13 +187,19 @@ const LicenseService = {
     let licenseKey = this._getSavedKey();
     const ui = SpreadsheetApp.getUi();
     
-    // 1. すでにキーが保存されていれば自動verify
+    // 1. すでにキーが保存されていれば自動チェック＆verify
     if (licenseKey) {
-      const isVerified = this.verifyLicense(licenseKey, 'verify');
-      if (isVerified) {
-        return true;
+      const statusRes = this._fetchKeyStatus(licenseKey);
+      if (statusRes.success && statusRes.keyStatus === 'inactive') {
+         ui.alert('🚫 ライセンス無効', 'このツールのライセンスは解約・無効化されています。管理者にお問い合わせください。', ui.ButtonSet.OK);
+         this._clearKey();
+         return false;
       }
-      // verify失敗（＝別のドライブに悪意をもってコピーされた等）の場合、キーを一旦クリアする
+      if (statusRes.success && statusRes.keyStatus === 'active') {
+         const isVerified = this.verifyLicense(licenseKey, 'verify');
+         if (isVerified) return true;
+      }
+      // verify失敗（＝別のドライブに悪意をもってコピーされた等）や存在しない場合はキーをクリアして再入力へ
       this._clearKey();
     }
 
@@ -187,12 +218,29 @@ const LicenseService = {
          return false;
       }
 
-      // 1. まず「すでにこの環境(ルートID)で有効なキーか」をverifyで確認する
-      let isValid = this.verifyLicense(licenseKey, 'verify');
-      
-      // 2. もしverifyが通らなければ、未使用の新規キーである可能性にかけてactivateを試みる
-      if (!isValid) {
-         // アクティベーションのための追加情報取得
+      // 3. 入力されたキーの事前ステータスチェック
+      const statusRes = this._fetchKeyStatus(licenseKey);
+      if (!statusRes.success) {
+         ui.alert('認証失敗', '存在しない、または無効なライセンスキーです。', ui.ButtonSet.OK);
+         return false;
+      }
+      if (statusRes.keyStatus === 'inactive') {
+         ui.alert('🚫 ライセンス無効', 'このライセンスは解約・無効化されています。\n利用手続きをご確認ください。', ui.ButtonSet.OK);
+         return false;
+      }
+
+      let isValid = false;
+
+      // 4. ステータスに応じた処理分岐
+      if (statusRes.keyStatus === 'active') {
+         // すでに使用中のキーの場合、現在の環境(ルートID)と一致するかを確認
+         isValid = this.verifyLicense(licenseKey, 'verify');
+         if (!isValid) {
+            ui.alert('認証失敗', '既に使用されている（別のドライブに紐付いている）キーのため使用できません。', ui.ButtonSet.OK);
+            return false;
+         }
+      } else if (statusRes.keyStatus === 'unused') {
+         // 未使用のキーの場合のみ、ユーザー情報の入力へ進む
          let email = "";
          while (!email) {
             const emailRes = ui.prompt('ユーザー登録 (1/3)', 'ライセンスと紐付けるメールアドレスを入力してください（必須）', ui.ButtonSet.OK_CANCEL);
@@ -221,13 +269,14 @@ const LicenseService = {
          isValid = this.verifyLicense(licenseKey, 'activate', extraData);
       }
 
+      // 最終処理
       if (isValid) {
          // 成功したら非表示シートに保存
          this._saveKey(licenseKey);
-         ui.alert('認証完了', 'ライセンスの認証が完了しました！\nこのファイルや、ここからコピーしたファイルを開く際は、設定が引き継がれるため自動で認証されます。', ui.ButtonSet.OK);
+         ui.alert('✅ 認証完了', 'ライセンスの認証が完了しました！\nこのファイルや、ここからコピーしたファイルを開く際は、設定が引き継がれるため自動で認証されます。', ui.ButtonSet.OK);
          return true;
       } else {
-         ui.alert('認証失敗', '無効なキー、または既に使用されている（別のドライブに紐付いている）キーです。', ui.ButtonSet.OK);
+         ui.alert('認証失敗', '登録中にエラーが発生しました。', ui.ButtonSet.OK);
          return false;
       }
     }

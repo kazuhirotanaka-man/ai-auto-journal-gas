@@ -29,6 +29,15 @@ function doPost(e) {
         let status = data[i][1];
         let registeredRootId = data[i][2];
         
+        // 【ステータス確認のみ（事前チェック用）】
+        if (action === 'check_status') {
+           return ContentService.createTextOutput(JSON.stringify({
+             status: 'success', 
+             keyStatus: status,
+             registeredRootId: registeredRootId || ""
+           })).setMimeType(ContentService.MimeType.JSON);
+        }
+        
         // 【アクティベーション（初回登録）】
         if (action === 'activate') {
            if (status === 'unused') {
