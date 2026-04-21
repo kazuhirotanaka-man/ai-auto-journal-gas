@@ -1,0 +1,15 @@
+{
+  "timeZone": "Asia/Tokyo",
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "JournalLib",
+        "libraryId": "1_w8C3LMpVylBGN0NyMDVTUd4_3HCGLZ4TFZ5brGMI1bmb2Z0tIQ9h71H",
+        "version": "0",
+        "developmentMode": true
+      }
+    ]
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8"
+}

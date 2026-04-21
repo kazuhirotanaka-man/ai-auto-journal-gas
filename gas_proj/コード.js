@@ -26,7 +26,14 @@ function formatRawDate(rawDate, tz) {
   return "";
 }
 
-function onOpen() {
+function onOpen(e) {
+  onOpenHook(e);
+}
+
+/**
+ * ライブラリとして外部から呼び出される初期化・メニュー構築フック
+ */
+function onOpenHook(e) {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu('🧾 仕訳作成AI')
     .addItem('▶ 未処理ファイルの解析を実行', 'processNewReceipts')
@@ -36,6 +43,8 @@ function onOpen() {
     .addSeparator()
     .addItem('💾 会計ソフト形式でエクスポート', 'exportCsvHandler')
     .addItem('☁️ freee会計に取引登録', 'exportFreeeHandler')
+    .addSeparator()
+    .addItem('🔑 Gemini APIキーを設定', 'setGeminiApiKey')
     .addToUi();
 
   // freee連携メニュー
@@ -51,6 +60,11 @@ function onOpen() {
     .addSeparator()
     .addItem('連携を解除', 'reset')
     .addToUi();
+}
+
+function setGeminiApiKey() {
+  if (!LicenseService.requireLicense()) return;
+  LicenseService.promptGeminiKey();
 }
 
 function exportCsvHandler() {
@@ -157,9 +171,9 @@ function processNewReceipts() {
   const ui = SpreadsheetApp.getUi();
 
   // APIキーの事前チェック
-  const apiKey = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-  if (!apiKey || apiKey.trim() === "") {
-    ui.alert("⚠️ 初期設定エラー", "Gemini APIキーが設定されていません。\n\nメニューの「拡張機能」＞「Apps Script」からエディタを開き、左側の「プロジェクトの設定（歯車マーク）」＞「スクリプトプロパティ」に GEMINI_API_KEY を追加してください。", ui.ButtonSet.OK);
+  const apiKey = LicenseService._getGeminiKey();
+  if (!apiKey) {
+    ui.alert("⚠️ 初期設定エラー", "Gemini APIキーが設定されていません。\n\nメニューの「🧾 仕訳作成AI」＞「🔑 Gemini APIキーを設定」からキーを登録してください。", ui.ButtonSet.OK);
     return;
   }
 
@@ -330,7 +344,8 @@ function getPopupData(rowIndex) {
       freeeDepartmentsList: config.freeeDepartmentsList || [],
       freeeTagsList: config.freeeTagsList || []
     };
-    return retData;
+    // シリアライズ不能なオブジェクト(Date等)が混入して通信が沈黙するのを防ぐ
+    return JSON.parse(JSON.stringify(retData));
   } else {
     // 弥生用ロジック
     const dateVal = formatRawDate(rowData[YAYOI_COL.DATE], tz);
@@ -357,7 +372,8 @@ function getPopupData(rowIndex) {
       subAccountsList: config.subAccountsList || [],
       taxCategoryList: config.taxCategoryList || []
     };
-    return retData;
+    // シリアライズ不能なオブジェクト(Date等)が混入して通信が沈黙するのを防ぐ
+    return JSON.parse(JSON.stringify(retData));
   }
 }
 
@@ -469,24 +485,20 @@ function updateAndProcessNext(rowIndex, updateData, action) {
   // 移動先の行を決定
   let nextRow = rowIndex;
   if (action === 'back') {
-    // 1つ前の行に移動（getPopupData がそこから上に遡って Head を特定します）
     nextRow = rowIndex - 1;
   } else {
-    // 複数明細の場合は、更新した明細の行数分だけスキップする
     const step = (updateData && updateData.details) ? updateData.details.length : 1;
     nextRow = rowIndex + step;
   }
 
   const maxRow = sheet.getLastRow();
   if (nextRow < 2 || nextRow > maxRow) {
-    return null; // 端に到達した
+    return null;
   }
 
-  // シート側の選択行も移動させる
   sheet.getRange(nextRow, 1).activate();
   const nextData = getPopupData(nextRow);
-
-  return nextData;
+  return nextData ? JSON.parse(JSON.stringify(nextData)) : null;
 }
 
 /**

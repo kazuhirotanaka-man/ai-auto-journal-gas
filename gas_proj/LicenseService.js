@@ -60,6 +60,43 @@ const LicenseService = {
   },
 
   /**
+   * 保存されているGemini APIキーを取得
+   */
+  _getGeminiKey: function() {
+    const sheet = this._getLicenseSheet();
+    const val = sheet.getRange("A2").getValue();
+    return val ? String(val).trim() : null;
+  },
+
+  /**
+   * Gemini APIキーを保存
+   */
+  _saveGeminiKey: function(key) {
+    const sheet = this._getLicenseSheet();
+    sheet.getRange("A2").setValue(key);
+  },
+
+  /**
+   * Gemini APIキー入力用プロンプトを表示
+   */
+  promptGeminiKey: function() {
+    const ui = SpreadsheetApp.getUi();
+    const currentKey = this._getGeminiKey();
+    const msg = currentKey 
+       ? `現在キーは設定済みです（変更する場合は新しいキーを入力してください）。\n\nGemini APIキーを入力してください：`
+       : `Gemini APIキーを入力してください：`;
+
+    const res = ui.prompt('APIキーの設定', msg, ui.ButtonSet.OK_CANCEL);
+    if (res.getSelectedButton() == ui.Button.OK) {
+       const newKey = res.getResponseText().trim();
+       if (newKey) {
+          this._saveGeminiKey(newKey);
+          ui.alert("完了", "Gemini APIキーを保存しました。", ui.ButtonSet.OK);
+       }
+    }
+  },
+
+  /**
    * 指定したファイルまたはフォルダが配置されている最上位ドライブのルートIDを取得する
    * @param {string} [targetId] 対象のファイル/フォルダID。省略時は現在のアクティブなスプレッドシートのID。
    * @returns {string} ルートフォルダのID
