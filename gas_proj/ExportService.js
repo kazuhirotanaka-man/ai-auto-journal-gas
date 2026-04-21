@@ -69,7 +69,7 @@ const ExportService = {
       <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
         <p>Google Driveにエクスポートファイルを作成しました。<br>以下のボタンからダウンロードできます。</p>
         <br>
-        <a href="${downloadUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+        <a href="${downloadUrl}" target="_blank" onclick="google.script.host.close()" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
           ファイルをダウンロード
         </a>
       </div>
