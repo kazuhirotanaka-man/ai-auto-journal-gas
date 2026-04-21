@@ -54,6 +54,8 @@ function onOpen() {
 }
 
 function exportCsvHandler() {
+  if (!LicenseService.requireLicense()) return;
+  
   const html = HtmlService.createHtmlOutputFromFile('ExportDialog')
     .setTitle('エクスポート対象の選択')
     .setWidth(320)
@@ -62,6 +64,8 @@ function exportCsvHandler() {
 }
 
 function exportFreeeHandler() {
+  if (!LicenseService.requireLicense()) return;
+  
   const html = HtmlService.createHtmlOutputFromFile('freee_ExportDialog')
     .setTitle('freee会計へ取引登録')
     .setWidth(320)
@@ -81,6 +85,8 @@ function executeExportProcess(statuses) {
  * サイドバーを表示する
  */
 function showSidebar() {
+  if (!LicenseService.requireLicense()) return;
+  
   const html = HtmlService.createHtmlOutputFromFile('Sidebar')
     .setTitle('証憑プレビュー')
     .setWidth(400); // サイドバーは最大300pxまでしか幅が広がらない仕様です
@@ -92,6 +98,8 @@ function showSidebar() {
  * ユーザーがサイズ変更や移動が可能で、より大きく表示できます
  */
 function showDialog() {
+  if (!LicenseService.requireLicense()) return;
+  
   const config = ConfigService.getAllConfig();
   if (config.accountingSoftware === "freee会計") {
     const html = HtmlService.createHtmlOutputFromFile('freee_Popup')
@@ -144,6 +152,8 @@ function getActiveFileId() {
  * メインの処理フロー：差分抽出 -> Gemini連携 -> シート書き込み -> ログ記録
  */
 function processNewReceipts() {
+  if (!LicenseService.requireLicense()) return;
+
   const ui = SpreadsheetApp.getUi();
 
   // APIキーの事前チェック
@@ -157,6 +167,12 @@ function processNewReceipts() {
 
   if (!config.folderId) {
     ui.alert("設定エラー", "対象のDriveフォルダURLが設定されていません。設定シートを確認してください。", ui.ButtonSet.OK);
+    return;
+  }
+  
+  // 証票フォルダのルートID同一性チェック
+  if (!LicenseService.isEvidenceFolderValid(config.folderId)) {
+    ui.alert("設定エラー", "指定された証票フォルダは、このツールに関連付けられたGoogleドライブ内にありません。\nセキュリティ保護のため、外部ドライブのフォルダは指定できません。", ui.ButtonSet.OK);
     return;
   }
 
