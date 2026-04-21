@@ -32,9 +32,12 @@ function doPost(e) {
         // 【アクティベーション（初回登録）】
         if (action === 'activate') {
            if (status === 'unused') {
-              // 未使用なら使用済みにし、RootIdを登録
+              // 未使用なら使用済みにし、RootId等を登録
               sheet.getRange(i + 1, 2).setValue('active');
               sheet.getRange(i + 1, 3).setValue(rootId);
+              sheet.getRange(i + 1, 4).setValue(params.email || "");
+              sheet.getRange(i + 1, 5).setValue(params.officeName || "");
+              sheet.getRange(i + 1, 6).setValue(params.userName || "");
               return ContentService.createTextOutput(JSON.stringify({status: 'success', message: 'Activated successfully'})).setMimeType(ContentService.MimeType.JSON);
            } else {
               return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Key is already used'})).setMimeType(ContentService.MimeType.JSON);

@@ -155,7 +155,33 @@ const LicenseService = {
       
       // 2. もしverifyが通らなければ、未使用の新規キーである可能性にかけてactivateを試みる
       if (!isValid) {
-         isValid = this.verifyLicense(licenseKey, 'activate');
+         // アクティベーションのための追加情報取得
+         let email = "";
+         while (!email) {
+            const emailRes = ui.prompt('ユーザー登録 (1/3)', 'ライセンスと紐付けるメールアドレスを入力してください（必須）', ui.ButtonSet.OK_CANCEL);
+            if (emailRes.getSelectedButton() != ui.Button.OK) return false;
+            email = emailRes.getResponseText().trim();
+            if (!email) ui.alert('エラー', 'メールアドレスは必須入力です。入力をお願いします。', ui.ButtonSet.OK);
+         }
+
+         let officeName = "";
+         while (!officeName) {
+            const officeRes = ui.prompt('ユーザー登録 (2/3)', '事務所名（会社名）を入力してください（必須）', ui.ButtonSet.OK_CANCEL);
+            if (officeRes.getSelectedButton() != ui.Button.OK) return false;
+            officeName = officeRes.getResponseText().trim();
+            if (!officeName) ui.alert('エラー', '事務所名は必須入力です。入力をお願いします。', ui.ButtonSet.OK);
+         }
+
+         let userName = "";
+         while (!userName) {
+            const nameRes = ui.prompt('ユーザー登録 (3/3)', 'ご担当者様の氏名を入力してください（必須）', ui.ButtonSet.OK_CANCEL);
+            if (nameRes.getSelectedButton() != ui.Button.OK) return false;
+            userName = nameRes.getResponseText().trim();
+            if (!userName) ui.alert('エラー', '氏名は必須入力です。入力をお願いします。', ui.ButtonSet.OK);
+         }
+
+         const extraData = { email: email, officeName: officeName, userName: userName };
+         isValid = this.verifyLicense(licenseKey, 'activate', extraData);
       }
 
       if (isValid) {
@@ -177,9 +203,10 @@ const LicenseService = {
    * API通信によるライセンスのアクティベーション／検証を行う
    * @param {string} licenseKey ユーザー入力または保存されたライセンスキー
    * @param {string} action 'activate' または 'verify'
+   * @param {object} [extraData] activate時に送信する追加データ（email, officeName, userName）
    * @returns {boolean} 認証結果
    */
-  verifyLicense: function(licenseKey, action = 'verify') {
+  verifyLicense: function(licenseKey, action = 'verify', extraData = {}) {
     if (!licenseKey) {
       return false;
     }
@@ -189,7 +216,10 @@ const LicenseService = {
     const payload = {
       action: action,
       licenseKey: licenseKey,
-      rootId: rootId
+      rootId: rootId,
+      email: extraData.email || "",
+      officeName: extraData.officeName || "",
+      userName: extraData.userName || ""
     };
     
     const options = {
