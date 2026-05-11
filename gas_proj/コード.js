@@ -56,8 +56,6 @@ function onOpenHook(e) {
     .addSeparator()
     .addItem('トークン自動更新設定', 'toggleAutoRefreshToken')
     .addSeparator()
-    .addItem('【デモ】取引の登録〜削除', 'runDealLifecycleSample')
-    .addSeparator()
     .addItem('連携を解除', 'reset')
     .addToUi();
 }
