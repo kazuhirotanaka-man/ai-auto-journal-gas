@@ -53,10 +53,10 @@ const ExportService = {
       return { error: `会計ソフト「${software}」の出力形式は現在未対応です。` };
     }
     
-    // CSVファイルをDriveのルートに作成
+    // CSVデータをBase64エンコードして直接ダウンロードさせる（Drive保存時の403エラー回避とセキュア化）
     const fileName = `仕訳エクスポート_${software}_${Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyyMMdd_HHmmss")}.csv`;
     const blob = Utilities.newBlob("", "text/csv", fileName).setDataFromString(csvData, "Shift_JIS"); // 汎用的にShift-JIS
-    const file = DriveApp.createFile(blob);
+    const base64Data = Utilities.base64Encode(blob.getBytes());
     
     // 出力対象となった行のステータスを一括で「ダウンロード済み」に変更
     rowIndicesToUpdate.forEach(rowIdx => {
@@ -64,15 +64,29 @@ const ExportService = {
     });
 
     // ダイアログを表示してダウンロードリンクを提供
-    const downloadUrl = `https://drive.google.com/uc?export=download&id=${file.getId()}`;
     const htmlOutput = HtmlService.createHtmlOutput(`
       <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-        <p>Google Driveにエクスポートファイルを作成しました。<br>以下のボタンからダウンロードできます。</p>
+        <p>エクスポートデータの準備が完了しました。<br>以下のボタンをクリックして保存してください。</p>
         <br>
-        <a href="${downloadUrl}" target="_blank" onclick="google.script.host.close()" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">
+        <button onclick="downloadCsv()" style="background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; font-weight: bold; font-size: 14px; cursor: pointer;">
           ファイルをダウンロード
-        </a>
+        </button>
       </div>
+      <script>
+        function downloadCsv() {
+          const a = document.createElement('a');
+          a.href = 'data:text/csv;base64,${base64Data}';
+          a.download = '${fileName}';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          
+          // ダウンロード開始の少し後にダイアログを閉じる
+          setTimeout(function() {
+            google.script.host.close();
+          }, 500);
+        }
+      </script>
     `).setWidth(350).setHeight(270);
     
     SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'エクスポート完了');

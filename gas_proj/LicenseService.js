@@ -221,7 +221,7 @@ const LicenseService = {
       // 3. 入力されたキーの事前ステータスチェック
       const statusRes = this._fetchKeyStatus(licenseKey);
       if (!statusRes.success) {
-         ui.alert('認証失敗', '存在しない、または無効なライセンスキーです。', ui.ButtonSet.OK);
+         ui.alert('認証失敗', 'エラー詳細: ' + (statusRes.message || '不明なエラー'), ui.ButtonSet.OK);
          return false;
       }
       if (statusRes.keyStatus === 'inactive') {
