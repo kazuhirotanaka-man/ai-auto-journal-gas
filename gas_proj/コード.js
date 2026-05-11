@@ -191,11 +191,13 @@ function processNewReceipts() {
   }
 
   // 1. 未処理ファイルの取得
+  console.info("未処理証憑ファイルの取得を開始します。対象フォルダID: " + config.folderId);
   ui.alert("情報", "フォルダをスキャンし、未処理の証憑を確認しています...", ui.ButtonSet.OK);
   let unprocessedFiles;
   try {
     unprocessedFiles = DriveServiceObj.getUnprocessedFiles(config.folderId);
   } catch (e) {
+    console.error("未処理ファイルの取得中にエラーが発生しました: ", e);
     ui.alert("エラー", "ファイル取得中にエラーが発生しました。\n" + e.message, ui.ButtonSet.OK);
     return;
   }
@@ -235,6 +237,7 @@ function processNewReceipts() {
     }
   }
 
+  console.info(`処理完了。成功: ${successCount}件, 失敗: ${errorCount}件`);
   ui.alert("処理完了", `解析が完了しました。\n成功: ${successCount}件\n失敗: ${errorCount}件`, ui.ButtonSet.OK);
 }
 
@@ -573,7 +576,7 @@ function insertFreeeDetailRow(rowIndex, detailIndex) {
     const bg = sheet.getRange(targetRow, 1, 1, 19).getBackgrounds()[0];
     sheet.getRange(targetRow + 1, 1, 1, 19).setBackgrounds([bg]);
   } catch (e) {
-    // 無視
+    console.warn("明細行の背景色引き継ぎをスキップしました（影響なし）: ", e.message);
   }
 
   // rowIndexの行を選択しておく

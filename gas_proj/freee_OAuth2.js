@@ -118,6 +118,7 @@ var OAuth2 = (function() {
       try {
         this.refresh();
       } catch (e) {
+        console.error("OAuth2トークンの自動リフレッシュに失敗しました。認証状態をリセットします: ", e);
         this.reset();
         return false;
       }

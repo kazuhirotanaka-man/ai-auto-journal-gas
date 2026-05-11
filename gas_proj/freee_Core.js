@@ -18,6 +18,7 @@ function getSafeUi() {
     }
     return ui;
   } catch (e) {
+    console.warn("UIコンテキストが取得できないためダミーUIを使用します: ", e.message);
     // UIが利用できない場合、ダミーのUIオブジェクトを返す
     const DUMMY_BUTTON = { OK: 'OK', CANCEL: 'CANCEL', YES: 'YES', NO: 'NO' };
     return {
@@ -96,6 +97,7 @@ function exchangeCode(code) {
   try {
     return getFreeeService().exchangeCodeForToken(code);
   } catch (e) {
+    console.error("Token exchange failed: ", e);
     Logger.log('Token exchange failed: ' + e.message);
     return false;
   }
@@ -238,6 +240,7 @@ function refreshFreeeToken() {
       Logger.log('Access token not available. Please re-authorize.');
     }
   } catch (e) {
+    console.error("Failed to refresh token: ", e);
     Logger.log('Failed to refresh token: ' + e.message);
   }
 }

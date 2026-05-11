@@ -73,6 +73,7 @@ const ConfigService = {
         return this._cache;
       } catch (e) {
         // パースエラーの場合は再取得へフォールバック
+        console.warn("設定キャッシュのパースに失敗しました。再取得へフォールバックします: ", e.message);
       }
     }
 
@@ -102,7 +103,9 @@ const ConfigService = {
     this._cache = config;
     try {
       cache.put('APP_CONFIG_CACHE', JSON.stringify(config), 3600); // 1時間のキャッシュ
-    } catch (e) {}
+    } catch (e) {
+      console.warn("設定のキャッシュ保存に失敗しました: ", e.message);
+    }
 
     return config;
   },
@@ -114,7 +117,9 @@ const ConfigService = {
     this._cache = null;
     try {
       CacheService.getScriptCache().remove('APP_CONFIG_CACHE');
-    } catch (e) {}
+    } catch (e) {
+      console.warn("設定キャッシュのクリアに失敗しました: ", e.message);
+    }
   },
 
   /**

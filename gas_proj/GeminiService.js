@@ -219,6 +219,7 @@ const GeminiService = {
       const cleanJson = textResult.replace(/```json/g, '').replace(/```/g, '').trim();
       return JSON.parse(cleanJson);
     } catch (e) {
+      console.error("AIからのJSONパースに失敗しました。レスポンス: ", jsonResponse);
       throw new Error("AIのレスポンスをJSONとして解釈できませんでした。 レスポンス: " + JSON.stringify(jsonResponse));
     }
   }

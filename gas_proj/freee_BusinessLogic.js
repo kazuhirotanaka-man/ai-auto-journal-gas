@@ -37,6 +37,7 @@ function getCompanies() {
 
   } catch (e) {
     // エラーハンドリング
+    console.error("freee事業所一覧の取得中にエラーが発生しました: ", e);
     getSafeUi().alert('エラーが発生しました: ' + e.message);
   }
 }
@@ -121,6 +122,7 @@ function runDealLifecycleSample() {
     ui.alert('削除後の取引一覧をログに出力しました。\n実行ログをご確認ください。');
 
   } catch (e) {
+    console.error("freeeデモ(取引登録〜削除)でエラーが発生しました: ", e);
     Logger.log('エラーが発生しました: ' + e.message);
     ui.alert('エラーが発生しました: ' + e.message);
   }
@@ -235,6 +237,7 @@ function executeFreeeExportProcess(statuses) {
           receiptId = receiptRes.receipt.id;
         }
       } catch (fileErr) {
+        console.error(`ファイルアップロードエラー(FileID: ${fileId}): `, fileErr);
         Logger.log(`ファイルアップロードエラー(FileID: ${fileId}): ${fileErr.message}`);
         attachmentErrorCount++;
         isAttachmentFailed = true;
@@ -373,12 +376,14 @@ function executeFreeeExportProcess(statuses) {
 
       successCount++;
     } catch (err) {
+      console.error("freee取引登録でエラーが発生しました: ", err);
       // 取引登録でエラーが発生した場合、アップロード済みの証憑をロールバック(削除)する
       if (receiptId) {
         try {
           callFreeeApi('delete', `/api/1/receipts/${receiptId}`, { company_id: companyId }, null);
           Logger.log(`ロールバック完了: ファイルボックスから証憑(${receiptId})を削除しました。`);
         } catch (rollbackErr) {
+          console.error(`証憑(${receiptId})のロールバック削除に失敗しました: `, rollbackErr);
           Logger.log(`ロールバック失敗: 証憑(${receiptId})の削除に失敗しました: ${rollbackErr.message}`);
         }
       }

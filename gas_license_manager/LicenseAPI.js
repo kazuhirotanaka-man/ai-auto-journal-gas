@@ -12,12 +12,14 @@ function doPost(e) {
     
     // パラメータチェック
     if (!licenseKey || !rootId) {
+       console.error('Missing parameters: licenseKey or rootId', params);
        return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Missing parameters'})).setMimeType(ContentService.MimeType.JSON);
     }
     
     // スプレッドシート側の対象シートを取得
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Licenses');
     if (!sheet) {
+        console.error('Licenses sheet not found in the active spreadsheet.');
         return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Licenses sheet not found'})).setMimeType(ContentService.MimeType.JSON);
     }
     
@@ -47,8 +49,10 @@ function doPost(e) {
               sheet.getRange(i + 1, 4).setValue(params.email || "");
               sheet.getRange(i + 1, 5).setValue(params.officeName || "");
               sheet.getRange(i + 1, 6).setValue(params.userName || "");
+              console.info(`Activated successfully. Key: ${licenseKey}, RootID: ${rootId}`);
               return ContentService.createTextOutput(JSON.stringify({status: 'success', message: 'Activated successfully'})).setMimeType(ContentService.MimeType.JSON);
            } else {
+              console.warn(`Activation failed: Key is already used. Key: ${licenseKey}`);
               return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Key is already used'})).setMimeType(ContentService.MimeType.JSON);
            }
         }
@@ -58,6 +62,7 @@ function doPost(e) {
            if (status === 'active' && registeredRootId === rootId) {
               return ContentService.createTextOutput(JSON.stringify({status: 'success', message: 'License verified'})).setMimeType(ContentService.MimeType.JSON);
            } else {
+              console.warn(`Verification failed: Invalid license or root ID mismatch. Key: ${licenseKey}, ExpectedRoot: ${registeredRootId}, ProvidedRoot: ${rootId}`);
               return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'Invalid license or root ID mismatch'})).setMimeType(ContentService.MimeType.JSON);
            }
         }
@@ -65,8 +70,10 @@ function doPost(e) {
     }
     
     // 一致するライセンスキーがない場合
+    console.warn(`License key not found: ${licenseKey}`);
     return ContentService.createTextOutput(JSON.stringify({status: 'error', message: 'License key not found'})).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
+    console.error('doPostエラー: ', error);
     return ContentService.createTextOutput(JSON.stringify({status: 'error', message: error.message})).setMimeType(ContentService.MimeType.JSON);
   }
 }

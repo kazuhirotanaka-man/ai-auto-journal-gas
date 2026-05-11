@@ -148,6 +148,7 @@ const LicenseService = {
        Logger.log(`[証票フォルダチェック] SS_Root: ${ssRootId}, Folder_Root: ${folderRootId}`);
        return ssRootId === folderRootId;
      } catch(e) {
+       console.error('証票フォルダのルートID確認に失敗しました: ', e);
        Logger.log('証票フォルダのルートID確認に失敗: ' + e.message);
        return false;
      }
@@ -174,6 +175,7 @@ const LicenseService = {
       }
       return { success: false, message: result.message };
     } catch (e) {
+      console.error('ライセンスキーステータス取得で通信エラー: ', e);
       return { success: false, message: e.message };
     }
   },
@@ -322,10 +324,12 @@ const LicenseService = {
       if (result.status === 'success') {
         return true;
       } else {
+        console.error('ライセンス認証エラー: ', result.message || '不明なエラー');
         Logger.log('認証エラー: ' + (result.message || '不明なエラー'));
         return false;
       }
     } catch (e) {
+      console.error('ライセンス認証の通信エラー: ', e);
       Logger.log('通信エラー: ' + e.message);
       return false;
     }

@@ -24,6 +24,7 @@ function fetchFreeeMasters() {
     syncFreeeMastersCore(companyId);
     ui.alert('完了', 'すべてのマスタの取得とシートへの書き出しが完了しました。', ui.ButtonSet.OK);
   } catch (e) {
+    console.error("マスタ同期処理全体でエラーが発生しました: ", e);
     Logger.log('マスタ取得エラー: ' + e.message);
     ui.alert('エラー', 'マスタ情報の取得中にエラーが発生しました。\n' + e.message, ui.ButtonSet.OK);
   }
@@ -39,6 +40,7 @@ function syncFreeeMastersCore(companyId) {
     SpreadsheetApp.getActiveSpreadsheet().toast('マスタ取得を開始しました。完了するまでお待ちください...', '処理中', -1);
   } catch (e) {
     // UIがないなどで失敗した場合は無視
+    console.warn("トーストの表示に失敗しました: ", e.message);
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -51,7 +53,9 @@ function syncFreeeMastersCore(companyId) {
     try {
       ss.toast(`現在: ${currentItemName} を取得しています...`, `マスタ取得状況 ( ${currentStepNum} / ${totalSteps} )`, 60);
       SpreadsheetApp.flush();
-    } catch (e) {}
+    } catch (e) {
+      console.warn("トースト更新に失敗しました: ", e.message);
+    }
   };
 
     // 取得時の共通パラメータ (可能な限り多くの件数を一度に取得するため limit: 3000 を設定)
@@ -145,7 +149,9 @@ function syncFreeeMastersCore(companyId) {
     try {
       ss.toast('すべてのマスタ情報の取得・シート反映が完了しました。', '完了', 5);
       ConfigService.clearCache(); // マスタ更新によりキャッシュをクリアする
-    } catch (e) {}
+    } catch (e) {
+      console.error("マスタ同期完了後の後処理(キャッシュクリア等)に失敗しました: ", e);
+    }
 }
 
 /**
