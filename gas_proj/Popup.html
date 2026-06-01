@@ -339,7 +339,10 @@
         document.getElementById('preview-frame').src = "";
       }
 
-      document.getElementById('warning-text').innerText = d.warningText ? "AI推測確度: " + d.warningText : "";
+      let aiGuessedInfo = [];
+      if (d.warningText) aiGuessedInfo.push("確度: " + d.warningText);
+      if (d.guessedDocumentType) aiGuessedInfo.push("種別: " + d.guessedDocumentType);
+      document.getElementById('warning-text').innerText = aiGuessedInfo.length > 0 ? "AI推測 - " + aiGuessedInfo.join(", ") : "";
 
       document.getElementById('ui-status').value = currentStatus;
       document.getElementById('ui-date').value = d.date || '';

@@ -3,7 +3,7 @@
  */
 
 const FREEE_COL = { INCOME_EXPENSE: 0, ACCRUAL_DATE: 1, PARTNER: 2, REG_NUM: 3, PAY_STATUS: 4, PAY_DATE: 5, WALLET: 6, ACC_ITEM: 7, AMOUNT: 8, TAX: 9, ITEM: 10, DEPT: 11, TAG: 12, DESC: 13, GUESS_DOC: 14, GUESS_PAY: 15, WARNING: 16, FILE_ID: 17, STATUS: 18 };
-const YAYOI_COL = { DATE: 0, DEBIT_ACC: 1, DEBIT_SUB: 2, DEBIT_TAX: 3, DEBIT_AMT: 4, CREDIT_ACC: 5, CREDIT_SUB: 6, CREDIT_TAX: 7, CREDIT_AMT: 8, DESC: 9, WARNING: 10, FILE_ID: 11, STATUS: 12 };
+const YAYOI_COL = { DATE: 0, DEBIT_ACC: 1, DEBIT_SUB: 2, DEBIT_TAX: 3, DEBIT_AMT: 4, CREDIT_ACC: 5, CREDIT_SUB: 6, CREDIT_TAX: 7, CREDIT_AMT: 8, DESC: 9, GUESS_DOC: 10, WARNING: 11, FILE_ID: 12, STATUS: 13 };
 
 /**
  * 日付（文字列またはDate）を "yyyy-MM-dd" 形式の文字列にフォーマットする
@@ -249,7 +249,7 @@ function getPopupData(rowIndex) {
 
   const isFreee = config.accountingSoftware === "freee会計";
   const sheetName = isFreee ? 'freee取引データ' : '仕訳データ';
-  const dataColumns = isFreee ? 19 : 13;
+  const dataColumns = isFreee ? 19 : 14;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
@@ -365,6 +365,7 @@ function getPopupData(rowIndex) {
         creditTax: rowData[YAYOI_COL.CREDIT_TAX],
         creditAmount: rowData[YAYOI_COL.CREDIT_AMT],
         description: rowData[YAYOI_COL.DESC],
+        guessedDocumentType: rowData[YAYOI_COL.GUESS_DOC],
         warningText: rowData[YAYOI_COL.WARNING],
         status: rowData[YAYOI_COL.STATUS] || '未確認'
       },
@@ -390,7 +391,7 @@ function updateAndProcessNext(rowIndex, updateData, action) {
 
   const isFreee = config.accountingSoftware === "freee会計";
   const sheetName = isFreee ? 'freee取引データ' : '仕訳データ';
-  const dataColumns = isFreee ? 19 : 13;
+  const dataColumns = isFreee ? 19 : 14;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);

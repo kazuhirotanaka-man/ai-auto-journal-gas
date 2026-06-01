@@ -21,8 +21,8 @@ const ExportService = {
       return { error: "エクスポート対象のデータがありません。" };
     }
     
-    const dataColumns = isFreee ? 18 : 13;
-    const statusColIndex = isFreee ? 17 : 12; // 0-indexed
+    const dataColumns = isFreee ? 18 : 14;
+    const statusColIndex = isFreee ? 17 : 13; // 0-indexed
     
     // データを取得
     const dataRange = sheet.getRange(2, 1, lastRow - 1, dataColumns);

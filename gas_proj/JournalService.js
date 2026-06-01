@@ -267,21 +267,22 @@ const JournalService = {
         creditTaxCategory,
         entry.amount || 0,
         entry.description || "",
+        entry.guessedDocumentType || (!isTarget ? "" : "領収書・レシート"),
         warningText,
-        file.getId(), // ファイルID (12列目)
-        "未確認"       // ステータス (13列目)
+        file.getId(), // ファイルID (13列目)
+        "未確認"       // ステータス (14列目)
       ]);
       bgColors.push(bgColor);
     });
     
     // 複数行を一括で書き込む
     if (rowDataArray.length > 0) {
-      sheet.getRange(targetRowIndex, 1, rowDataArray.length, 13).setValues(rowDataArray);
+      sheet.getRange(targetRowIndex, 1, rowDataArray.length, 14).setValues(rowDataArray);
       
       // 背景色の適用（行ごとに設定）
       bgColors.forEach((color, index) => {
         if (color) {
-          sheet.getRange(targetRowIndex + index, 1, 1, 13).setBackground(color);
+          sheet.getRange(targetRowIndex + index, 1, 1, 14).setBackground(color);
         }
       });
     }
@@ -297,6 +298,8 @@ const JournalService = {
     
     const now = new Date();
     // A列: ファイルID, B列: 日時, C列: ファイル名(備考)
-    sheet.appendRow([file.getId(), now, file.getName()]);
+    const lastRow = this.getActualLastRow(sheet);
+    const targetRow = lastRow + 1;
+    sheet.getRange(targetRow, 1, 1, 3).setValues([[file.getId(), now, file.getName()]]);
   }
 };
