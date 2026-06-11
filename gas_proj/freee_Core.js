@@ -1,6 +1,6 @@
 // freee APIのクライアントIDとクライアントシークレットを設定
-const CLIENT_ID = '705718818614667';
-const CLIENT_SECRET = 'YRCW1uGn_ReGOR3MmgzpoA_MEXbfbL63Yx4cU2YnNtNwN4C4QjJQ5U7KskoxLPHUDmcpvTA7X9YBl4q3-DhjgQ';
+const CLIENT_ID = '744784851906479';
+const CLIENT_SECRET = 'WtLzqPatmZdquv8GRoy78QlzKxkOSa92zLT54x5ERTO-7p7J_5Vm2bpi2aSnguQ3eAZwztW5i_NvGXaaMlefzw';
 
 const FREEE_API_BASE_URL = 'https://api.freee.co.jp';
 
