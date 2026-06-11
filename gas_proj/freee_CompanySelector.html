@@ -24,11 +24,17 @@
 
     <p>操作対象とする事業所を選択してください。</p>
     <select id="company-list"></select>
-    <button onclick="saveSelection()">この事業所を選択する</button>
+    <button id="save-company-btn" onclick="saveSelection()">この事業所を選択する</button>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            google.script.run.withSuccessHandler(populateForm).getCompanySelectorInfo();
+            google.script.run
+                .withSuccessHandler(populateForm)
+                .withFailureHandler((err) => {
+                    const statusDiv = document.getElementById('status');
+                    statusDiv.innerHTML = `<div class="status status-ng">読み込みエラー: ${err.message}</div>`;
+                })
+                .getCompanySelectorInfo();
         });
 
         function populateForm(data) {
@@ -61,16 +67,29 @@
         function saveSelection() {
             const select = document.getElementById('company-list');
             const selectedId = select.value;
-            const button = event.target;
+            const button = document.getElementById('save-company-btn');
             button.textContent = '保存中...';
             button.disabled = true;
 
-            google.script.run.withSuccessHandler(() => {
-                // 再度情報を読み込んで表示を更新
-                google.script.run.withSuccessHandler(populateForm).getCompanySelectorInfo();
-                button.textContent = 'この事業所を選択する';
-                button.disabled = false;
-            }).setSelectedCompany(selectedId);
+            google.script.run
+                .withSuccessHandler(() => {
+                    // 再度情報を読み込んで表示を更新
+                    google.script.run
+                        .withSuccessHandler(populateForm)
+                        .withFailureHandler((err) => {
+                            const statusDiv = document.getElementById('status');
+                            statusDiv.innerHTML = `<div class="status status-ng">エラー: ${err.message}</div>`;
+                        })
+                        .getCompanySelectorInfo();
+                    button.textContent = 'この事業所を選択する';
+                    button.disabled = false;
+                })
+                .withFailureHandler((err) => {
+                    alert('保存に失敗しました: ' + err.message);
+                    button.textContent = 'この事業所を選択する';
+                    button.disabled = false;
+                })
+                .setSelectedCompany(selectedId);
         }
     </script>
 </body>

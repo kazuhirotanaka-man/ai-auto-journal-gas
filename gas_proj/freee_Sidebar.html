@@ -47,14 +47,20 @@
             <p class="step-title">ステップ2: 認可コードを貼り付け</p>
             <p>freeeの画面に表示された「認可コード」を下に貼り付けて、認証を完了してください。</p>
             <input type="text" id="auth-code" placeholder="ここに認可コードを貼り付け">
-            <button onclick="submitAuthCode()">認証を完了する</button>
+            <button id="auth-code-submit-btn" onclick="submitAuthCode()">認証を完了する</button>
         </div>
     </div>
 
     <script>
         // ページ読み込み時に認証状態とURLを取得
         document.addEventListener('DOMContentLoaded', function() {
-            google.script.run.withSuccessHandler(updateUi).getSidebarState();
+            google.script.run
+                .withSuccessHandler(updateUi)
+                .withFailureHandler(function(err) {
+                    const statusDiv = document.getElementById('status');
+                    statusDiv.innerHTML = '<div class="status status-ng">エラーが発生しました: ' + err.message + '</div>';
+                })
+                .getSidebarState();
         });
 
         function updateUi(state) {
@@ -85,21 +91,28 @@
                 return;
             }
             // ボタンを無効化してフィードバック
-            const button = event.target;
+            const button = document.getElementById('auth-code-submit-btn');
             button.textContent = '処理中...';
             button.disabled = true;
 
-            google.script.run.withSuccessHandler(function(success) {
-                if (success) {
-                    // 成功したら現在のサイドバーを閉じて、事業所選択サイドバーを開く
-                    google.script.run.showCompanySelectorSidebar();
-                    google.script.host.close();
-                } else {
-                    alert('認証に失敗しました。認可コードが正しいか確認してください。');
+            google.script.run
+                .withSuccessHandler(function(success) {
+                    if (success) {
+                        // 成功したら現在のサイドバーを閉じて、事業所選択サイドバーを開く
+                        google.script.run.showCompanySelectorSidebar();
+                        google.script.host.close();
+                    } else {
+                        alert('認証に失敗しました。認可コードが正しいか確認してください。');
+                        button.textContent = '認証を完了する';
+                        button.disabled = false;
+                    }
+                })
+                .withFailureHandler(function(err) {
+                    alert('エラーが発生しました: ' + err.message);
                     button.textContent = '認証を完了する';
                     button.disabled = false;
-                }
-            }).exchangeCode(code);
+                })
+                .exchangeCode(code);
         }
     </script>
 </body>

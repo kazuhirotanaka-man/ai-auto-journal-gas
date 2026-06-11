@@ -96,3 +96,11 @@ function executeExportProcess(statuses) {
 function executeFreeeExportProcess(statuses) {
   return JournalLib.executeFreeeExportProcess(statuses);
 }
+
+function exchangeCode(code) {
+  return JournalLib.exchangeCode(code);
+}
+
+function setSelectedCompany(companyId) {
+  return JournalLib.setSelectedCompany(companyId);
+}
