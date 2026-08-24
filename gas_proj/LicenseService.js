@@ -6,6 +6,7 @@ const LicenseService = {
   // ライセンス管理APIのWeb App URL
   API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbzyAALAzum57v1BR05Gci0GL9YRyZTZqe-N332oFvB4COfXQuA-EHZjOBIomM_VE40g/exec',
   LICENSE_SHEET_NAME: 'License',
+  CACHE_EXPIRATION_SECONDS: 3600, // 1時間キャッシュ
 
   /**
    * ライセンス保持用の非表示シートを取得または作成する
@@ -35,6 +36,55 @@ const LicenseService = {
   },
 
   /**
+   * キャッシュが有効（直近で検証成功済み）か判定する
+   * @param {string} licenseKey 
+   * @returns {boolean}
+   */
+  _isCacheValid: function(licenseKey) {
+    if (!licenseKey) return false;
+    try {
+      const rootId = this.getDriveRootId();
+      const cache = CacheService.getScriptCache();
+      const val = cache.get(`LICENSE_OK_${licenseKey}_${rootId}`);
+      return val === 'true';
+    } catch (e) {
+      console.warn('ライセンスキャッシュ確認エラー: ', e.message);
+      return false;
+    }
+  },
+
+  /**
+   * キャッシュに検証成功状態を保存する（1時間有効）
+   * @param {string} licenseKey 
+   */
+  _setCacheValid: function(licenseKey) {
+    if (!licenseKey) return;
+    try {
+      const rootId = this.getDriveRootId();
+      const cache = CacheService.getScriptCache();
+      cache.put(`LICENSE_OK_${licenseKey}_${rootId}`, 'true', this.CACHE_EXPIRATION_SECONDS);
+    } catch (e) {
+      console.warn('ライセンスキャッシュ保存エラー: ', e.message);
+    }
+  },
+
+  /**
+   * キャッシュをクリアする
+   * @param {string} [licenseKey] 
+   */
+  _clearCache: function(licenseKey) {
+    try {
+      const cache = CacheService.getScriptCache();
+      if (licenseKey) {
+        const rootId = this.getDriveRootId();
+        cache.remove(`LICENSE_OK_${licenseKey}_${rootId}`);
+      }
+    } catch (e) {
+      console.warn('ライセンスキャッシュ削除エラー: ', e.message);
+    }
+  },
+
+  /**
    * 保存されているライセンスキーを取得
    */
   _getSavedKey: function() {
@@ -55,6 +105,10 @@ const LicenseService = {
    * ライセンスキーの保存をクリア
    */
   _clearKey: function() {
+    const key = this._getSavedKey();
+    if (key) {
+      this._clearCache(key);
+    }
     const sheet = this._getLicenseSheet();
     sheet.getRange("A1").clearContent();
   },
@@ -156,9 +210,10 @@ const LicenseService = {
 
   /**
    * API通信でキーの状態だけを事前確認する
+   * @returns {{ success: boolean, keyStatus?: string, isNetworkError?: boolean, message?: string }}
    */
   _fetchKeyStatus: function(licenseKey) {
-    if (!licenseKey) return { success: false };
+    if (!licenseKey) return { success: false, isNetworkError: false, message: 'ライセンスキーが指定されていません' };
     const rootId = this.getDriveRootId();
     const payload = { action: 'check_status', licenseKey: licenseKey, rootId: rootId };
     const options = {
@@ -169,15 +224,83 @@ const LicenseService = {
     };
     try {
       const response = UrlFetchApp.fetch(this.API_ENDPOINT, options);
+      if (response.getResponseCode() !== 200) {
+        console.error(`ライセンスAPIレスポンスエラー (HTTP ${response.getResponseCode()}): `, response.getContentText());
+        return { success: false, isNetworkError: true, message: `HTTPステータス: ${response.getResponseCode()}` };
+      }
       const result = JSON.parse(response.getContentText());
       if (result.status === 'success') {
         return { success: true, keyStatus: result.keyStatus };
       }
-      return { success: false, message: result.message };
+      return { success: false, isNetworkError: false, message: result.message };
     } catch (e) {
       console.error('ライセンスキーステータス取得で通信エラー: ', e);
-      return { success: false, message: e.message };
+      return { success: false, isNetworkError: true, message: e.message };
     }
+  },
+
+  /**
+   * API通信によるライセンスのアクティベーション／検証の詳細を取得する内部メソッド
+   * @param {string} licenseKey ユーザー入力または保存されたライセンスキー
+   * @param {string} action 'activate' または 'verify'
+   * @param {object} [extraData] activate時に送信する追加データ（email, officeName, userName）
+   * @returns {{ success: boolean, isNetworkError?: boolean, message?: string }}
+   */
+  _verifyLicenseDetail: function(licenseKey, action = 'verify', extraData = {}) {
+    if (!licenseKey) {
+      return { success: false, isNetworkError: false, message: 'ライセンスキーが空です' };
+    }
+
+    const rootId = this.getDriveRootId();
+    
+    const payload = {
+      action: action,
+      licenseKey: licenseKey,
+      rootId: rootId,
+      email: extraData.email || "",
+      officeName: extraData.officeName || "",
+      userName: extraData.userName || ""
+    };
+    
+    const options = {
+      method: "post",
+      payload: JSON.stringify(payload),
+      contentType: "application/json",
+      muteHttpExceptions: true
+    };
+
+    try {
+      const response = UrlFetchApp.fetch(this.API_ENDPOINT, options);
+      if (response.getResponseCode() !== 200) {
+        console.error(`ライセンス検証レスポンスエラー (HTTP ${response.getResponseCode()}): `, response.getContentText());
+        return { success: false, isNetworkError: true, message: `HTTPステータス: ${response.getResponseCode()}` };
+      }
+      const result = JSON.parse(response.getContentText());
+      
+      if (result.status === 'success') {
+        return { success: true, message: result.message };
+      } else {
+        console.error('ライセンス認証エラー: ', result.message || '不明なエラー');
+        Logger.log('認証エラー: ' + (result.message || '不明なエラー'));
+        return { success: false, isNetworkError: false, message: result.message || '認証エラー' };
+      }
+    } catch (e) {
+      console.error('ライセンス認証の通信エラー: ', e);
+      Logger.log('通信エラー: ' + e.message);
+      return { success: false, isNetworkError: true, message: e.message };
+    }
+  },
+
+  /**
+   * API通信によるライセンスのアクティベーション／検証を行う
+   * @param {string} licenseKey ユーザー入力または保存されたライセンスキー
+   * @param {string} action 'activate' または 'verify'
+   * @param {object} [extraData] activate時に送信する追加データ（email, officeName, userName）
+   * @returns {boolean} 認証結果
+   */
+  verifyLicense: function(licenseKey, action = 'verify', extraData = {}) {
+    const res = this._verifyLicenseDetail(licenseKey, action, extraData);
+    return res.success;
   },
 
   /**
@@ -189,23 +312,52 @@ const LicenseService = {
     let licenseKey = this._getSavedKey();
     const ui = SpreadsheetApp.getUi();
     
-    // 1. すでにキーが保存されていれば自動チェック＆verify
+    // 1. すでにキーが保存されている場合
     if (licenseKey) {
+      // キャッシュが有効（直近1時間以内に検証成功済み）なら通信をスキップして通過
+      if (this._isCacheValid(licenseKey)) {
+        return true;
+      }
+
+      // キャッシュがない場合、APIサーバーにステータス確認
       const statusRes = this._fetchKeyStatus(licenseKey);
+
+      // 通信エラーの場合：キーを消去せず、警告アラートを出して処理中断（再入力は要求しない）
+      if (!statusRes.success && statusRes.isNetworkError) {
+         ui.alert('⚠️ 通信エラー', 'ライセンス認証サーバーとの通信に一時的に失敗しました。\nネットワーク環境をご確認の上、しばらく時間をおいて再実行してください。\n（※保存されているライセンスキーは保持されています）', ui.ButtonSet.OK);
+         return false;
+      }
+
+      // 解約・無効化されている場合：キーを消去して中断
       if (statusRes.success && statusRes.keyStatus === 'inactive') {
          ui.alert('🚫 ライセンス無効', 'このツールのライセンスは解約・無効化されています。管理者にお問い合わせください。', ui.ButtonSet.OK);
          this._clearKey();
          return false;
       }
+
+      // 有効キーの場合：ルートIDとの紐付けを検証
       if (statusRes.success && statusRes.keyStatus === 'active') {
-         const isVerified = this.verifyLicense(licenseKey, 'verify');
-         if (isVerified) return true;
+         const verifyRes = this._verifyLicenseDetail(licenseKey, 'verify');
+         if (verifyRes.success) {
+            this._setCacheValid(licenseKey);
+            return true;
+         }
+         // 検証時の通信エラーの場合：キーを消去せず中断
+         if (verifyRes.isNetworkError) {
+            ui.alert('⚠️ 通信エラー', 'ライセンス認証サーバーとの通信に一時的に失敗しました。\nネットワーク環境をご確認の上、しばらく時間をおいて再実行してください。\n（※保存されているライセンスキーは保持されています）', ui.ButtonSet.OK);
+            return false;
+         }
+         // 明示的なルートID不一致や認証失敗（別ドライブへの移動・不正コピー等）
+         ui.alert('🚫 ライセンス認証エラー', 'ライセンス情報と現在のGoogleドライブ環境が一致しませんでした。\n別のドライブへ移動されたか、別のアカウントで開かれている可能性があります。\n再度ライセンスキーを入力してください。', ui.ButtonSet.OK);
+         this._clearKey();
+      } else {
+         // キーが見つからない等の明示的エラー
+         ui.alert('🚫 ライセンスエラー', '登録されているライセンスキーが無効です（' + (statusRes.message || 'キーが見つかりません') + '）。\n再度ライセンスキーを入力してください。', ui.ButtonSet.OK);
+         this._clearKey();
       }
-      // verify失敗（＝別のドライブに悪意をもってコピーされた等）や存在しない場合はキーをクリアして再入力へ
-      this._clearKey();
     }
 
-    // 2. キーがない（またはverify失敗）場合、UIから入力を求める
+    // 2. キーがない（または明示的認証失敗で消去された）場合、UIから入力を求める
     const promptResponse = ui.prompt(
       '🌟 ライセンス認証',
       'このツールを使用するにはライセンスキーが必要です。\n購入時にお渡ししたキーを入力してください。',
@@ -223,7 +375,11 @@ const LicenseService = {
       // 3. 入力されたキーの事前ステータスチェック
       const statusRes = this._fetchKeyStatus(licenseKey);
       if (!statusRes.success) {
-         ui.alert('認証失敗', 'エラー詳細: ' + (statusRes.message || '不明なエラー'), ui.ButtonSet.OK);
+         if (statusRes.isNetworkError) {
+            ui.alert('⚠️ 通信エラー', 'ライセンス認証サーバーとの通信に失敗しました。\nネットワーク環境をご確認の上、再度お試しください。', ui.ButtonSet.OK);
+         } else {
+            ui.alert('認証失敗', 'エラー詳細: ' + (statusRes.message || '不明なエラー'), ui.ButtonSet.OK);
+         }
          return false;
       }
       if (statusRes.keyStatus === 'inactive') {
@@ -236,9 +392,15 @@ const LicenseService = {
       // 4. ステータスに応じた処理分岐
       if (statusRes.keyStatus === 'active') {
          // すでに使用中のキーの場合、現在の環境(ルートID)と一致するかを確認
-         isValid = this.verifyLicense(licenseKey, 'verify');
-         if (!isValid) {
-            ui.alert('認証失敗', '既に使用されている（別のドライブに紐付いている）キーのため使用できません。', ui.ButtonSet.OK);
+         const verifyRes = this._verifyLicenseDetail(licenseKey, 'verify');
+         if (verifyRes.success) {
+            isValid = true;
+         } else {
+            if (verifyRes.isNetworkError) {
+               ui.alert('⚠️ 通信エラー', 'ライセンス認証サーバーとの通信に失敗しました。再度お試しください。', ui.ButtonSet.OK);
+            } else {
+               ui.alert('認証失敗', '既に使用されている（別のドライブに紐付いている）キーのため使用できません。', ui.ButtonSet.OK);
+            }
             return false;
          }
       } else if (statusRes.keyStatus === 'unused') {
@@ -268,13 +430,24 @@ const LicenseService = {
          }
 
          const extraData = { email: email, officeName: officeName, userName: userName };
-         isValid = this.verifyLicense(licenseKey, 'activate', extraData);
+         const activateRes = this._verifyLicenseDetail(licenseKey, 'activate', extraData);
+         if (activateRes.success) {
+            isValid = true;
+         } else {
+            if (activateRes.isNetworkError) {
+               ui.alert('⚠️ 通信エラー', 'ライセンス登録処理中に通信エラーが発生しました。再度お試しください。', ui.ButtonSet.OK);
+            } else {
+               ui.alert('認証失敗', '登録中にエラーが発生しました: ' + (activateRes.message || ''), ui.ButtonSet.OK);
+            }
+            return false;
+         }
       }
 
       // 最終処理
       if (isValid) {
-         // 成功したら非表示シートに保存
+         // 成功したら非表示シートに保存 & キャッシュをセット
          this._saveKey(licenseKey);
+         this._setCacheValid(licenseKey);
          ui.alert('✅ 認証完了', 'ライセンスの認証が完了しました！\nこのファイルや、ここからコピーしたファイルを開く際は、設定が引き継がれるため自動で認証されます。', ui.ButtonSet.OK);
          return true;
       } else {
@@ -285,53 +458,5 @@ const LicenseService = {
     
     // 入力キャンセル時
     return false;
-  },
-
-  /**
-   * API通信によるライセンスのアクティベーション／検証を行う
-   * @param {string} licenseKey ユーザー入力または保存されたライセンスキー
-   * @param {string} action 'activate' または 'verify'
-   * @param {object} [extraData] activate時に送信する追加データ（email, officeName, userName）
-   * @returns {boolean} 認証結果
-   */
-  verifyLicense: function(licenseKey, action = 'verify', extraData = {}) {
-    if (!licenseKey) {
-      return false;
-    }
-
-    const rootId = this.getDriveRootId();
-    
-    const payload = {
-      action: action,
-      licenseKey: licenseKey,
-      rootId: rootId,
-      email: extraData.email || "",
-      officeName: extraData.officeName || "",
-      userName: extraData.userName || ""
-    };
-    
-    const options = {
-      method: "post",
-      payload: JSON.stringify(payload),
-      contentType: "application/json",
-      muteHttpExceptions: true
-    };
-
-    try {
-      const response = UrlFetchApp.fetch(this.API_ENDPOINT, options);
-      const result = JSON.parse(response.getContentText());
-      
-      if (result.status === 'success') {
-        return true;
-      } else {
-        console.error('ライセンス認証エラー: ', result.message || '不明なエラー');
-        Logger.log('認証エラー: ' + (result.message || '不明なエラー'));
-        return false;
-      }
-    } catch (e) {
-      console.error('ライセンス認証の通信エラー: ', e);
-      Logger.log('通信エラー: ' + e.message);
-      return false;
-    }
   }
 };
