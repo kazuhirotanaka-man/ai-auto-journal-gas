@@ -7,6 +7,7 @@ const ExportService = {
    * 選択されたステータスに応じてCSVを出力し、出力を完了したデータのステータスを「ダウンロード済み」にする
    */
   exportToCsvWithStatuses: function(statuses) {
+    const startTime = Date.now();
     const config = ConfigService.getAllConfig();
     const software = config.accountingSoftware || "弥生会計";
     const isFreee = software === "freee会計";
@@ -16,8 +17,17 @@ const ExportService = {
     const sheet = ss.getSheetByName(sheetName);
     
     // データのある範囲を取得（ヘッダーを除く）
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) {
+    const lastRow = sheet ? sheet.getLastRow() : 0;
+    if (!sheet || lastRow < 2) {
+      LicenseService.logUsage({
+        action: 'CSV出力',
+        accountingSoftware: software,
+        processedCount: 0,
+        journalCount: 0,
+        status: 'エラー',
+        errorMessage: 'エクスポート対象のデータがありません。',
+        processingTimeSec: Math.round((Date.now() - startTime) / 100) / 10
+      });
       return { error: "エクスポート対象のデータがありません。" };
     }
     
@@ -40,6 +50,15 @@ const ExportService = {
     });
 
     if (targetRows.length === 0) {
+      LicenseService.logUsage({
+        action: 'CSV出力',
+        accountingSoftware: software,
+        processedCount: 0,
+        journalCount: 0,
+        status: 'エラー',
+        errorMessage: '選択されたステータスに該当するデータがありません。',
+        processingTimeSec: Math.round((Date.now() - startTime) / 100) / 10
+      });
       return { error: "選択されたステータスに該当するデータがありません。" };
     }
 
@@ -48,9 +67,29 @@ const ExportService = {
     if (software === "弥生会計") {
       csvData = this.buildYayoiCsv(targetRows);
     } else if (software === "freee会計") {
-      return { error: `freee会計の場合は、CSVエクスポート機能ではなく専用のAPIを利用した「取引登録」機能を後日利用する予定です。（現在はエクスポートを行いません）` };
+      const errMsg = "freee会計の場合は、CSVエクスポート機能ではなく専用のAPIを利用した「取引登録」機能を後日利用する予定です。（現在はエクスポートを行いません）";
+      LicenseService.logUsage({
+        action: 'CSV出力',
+        accountingSoftware: software,
+        processedCount: targetRows.length,
+        journalCount: 0,
+        status: 'エラー',
+        errorMessage: errMsg,
+        processingTimeSec: Math.round((Date.now() - startTime) / 100) / 10
+      });
+      return { error: errMsg };
     } else {
-      return { error: `会計ソフト「${software}」の出力形式は現在未対応です。` };
+      const errMsg = `会計ソフト「${software}」の出力形式は現在未対応です。`;
+      LicenseService.logUsage({
+        action: 'CSV出力',
+        accountingSoftware: software,
+        processedCount: targetRows.length,
+        journalCount: 0,
+        status: 'エラー',
+        errorMessage: errMsg,
+        processingTimeSec: Math.round((Date.now() - startTime) / 100) / 10
+      });
+      return { error: errMsg };
     }
     
     // CSVデータをBase64エンコードして直接ダウンロードさせる（Drive保存時の403エラー回避とセキュア化）
@@ -61,6 +100,17 @@ const ExportService = {
     // 出力対象となった行のステータスを一括で「ダウンロード済み」に変更
     rowIndicesToUpdate.forEach(rowIdx => {
       sheet.getRange(rowIdx, statusColIndex + 1).setValue("ダウンロード済み");
+    });
+
+    const durationSec = Math.round((Date.now() - startTime) / 100) / 10;
+    // 利用状況ログを送信
+    LicenseService.logUsage({
+      action: 'CSV出力',
+      accountingSoftware: software,
+      processedCount: targetRows.length,
+      journalCount: targetRows.length,
+      status: '成功',
+      processingTimeSec: durationSec
     });
 
     // ダイアログを表示してダウンロードリンクを提供

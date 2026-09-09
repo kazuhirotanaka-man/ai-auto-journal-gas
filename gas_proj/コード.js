@@ -166,6 +166,7 @@ function getActiveFileId() {
 function processNewReceipts() {
   if (!LicenseService.requireLicense()) return;
 
+  const startTime = Date.now();
   const ui = SpreadsheetApp.getUi();
 
   // APIキーの事前チェック
@@ -197,6 +198,15 @@ function processNewReceipts() {
   } catch (e) {
     console.error("未処理ファイルの取得中にエラーが発生しました: ", e);
     ui.alert("エラー", "ファイル取得中にエラーが発生しました。\n" + e.message, ui.ButtonSet.OK);
+    LicenseService.logUsage({
+      action: 'AI仕訳解析',
+      accountingSoftware: config.accountingSoftware || '',
+      processedCount: 0,
+      journalCount: 0,
+      status: 'エラー',
+      errorMessage: 'ファイル取得エラー: ' + e.message,
+      processingTimeSec: Math.round((Date.now() - startTime) / 100) / 10
+    });
     return;
   }
 
@@ -211,6 +221,10 @@ function processNewReceipts() {
   // 2. ループ処理でGeminiに送信し、結果をシートに追記
   let successCount = 0;
   let errorCount = 0;
+  let totalJournalRows = 0;
+  let warningEntriesCount = 0;
+  let skipFilesCount = 0;
+  let lastErrorMessage = "";
 
   for (let i = 0; i < unprocessedFiles.length; i++) {
     const item = unprocessedFiles[i];
@@ -228,12 +242,54 @@ function processNewReceipts() {
       JournalService.logProcessedFile(file);
 
       successCount++;
+
+      // メタ情報の集計
+      if (parsedData.isTarget === false) {
+        skipFilesCount++;
+      }
+      const entries = Array.isArray(parsedData.entries) ? parsedData.entries : [parsedData];
+      totalJournalRows += entries.length;
+      entries.forEach(entry => {
+        if (entry.confidence === "低" || entry.confidence === "中") {
+          warningEntriesCount++;
+        }
+      });
     } catch (e) {
       console.error(`ファイル [${file.getName()}] の処理に失敗しました: `, e);
       errorCount++;
-      // エラーログ等に記録することも検討
+      lastErrorMessage = e.message;
     }
   }
+
+  const durationSec = Math.round((Date.now() - startTime) / 100) / 10;
+  let overallStatus = "成功";
+  if (errorCount > 0 && successCount === 0) {
+    overallStatus = "エラー";
+  } else if (errorCount > 0 || warningEntriesCount > 0) {
+    overallStatus = "警告";
+  }
+
+  let warningParts = [];
+  if (warningEntriesCount > 0) warningParts.push(`要確認: ${warningEntriesCount}件`);
+  if (skipFilesCount > 0) warningParts.push(`対象外: ${skipFilesCount}件`);
+  const warningText = warningParts.join(", ");
+
+  let errorDetails = "";
+  if (errorCount > 0) {
+    errorDetails = lastErrorMessage ? `失敗: ${errorCount}件 (${lastErrorMessage})` : `失敗: ${errorCount}件`;
+  }
+
+  // 利用状況ログを送信
+  LicenseService.logUsage({
+    action: 'AI仕訳解析',
+    accountingSoftware: config.accountingSoftware || '弥生会計',
+    processedCount: successCount + errorCount,
+    journalCount: totalJournalRows,
+    warningCount: warningText,
+    status: overallStatus,
+    errorMessage: errorDetails,
+    processingTimeSec: durationSec
+  });
 
   console.info(`処理完了。成功: ${successCount}件, 失敗: ${errorCount}件`);
   ui.alert("処理完了", `解析が完了しました。\n成功: ${successCount}件\n失敗: ${errorCount}件`, ui.ButtonSet.OK);

@@ -9,6 +9,8 @@ function onOpen() {
     .addSeparator()
     .addItem('選択中のライセンスをリセット（PC変更・未認証へ）', 'resetSelectedLicense')
     .addItem('選択中のライセンスを無効化（解約扱い）', 'deactivateSelectedLicense')
+    .addSeparator()
+    .addItem('📊 「利用状況」シートを初期化/確認', 'initUsageLogSheet')
     .addToUi();
 }
 
@@ -110,4 +112,15 @@ function deactivateSelectedLicense() {
     sheet.getRange(row, 1, 1, 7).setBackground('#fce8e6'); // 無効化されたことがわかるように赤背景
     ui.alert('無効化完了', 'ライセンスを無効化（解約）しました。', ui.ButtonSet.OK);
   }
+}
+
+/**
+ * 「利用状況」シートを初期化または確認する
+ */
+function initUsageLogSheet() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = getOrCreateUsageSheet(ss);
+  ss.setActiveSheet(sheet);
+  ui.alert('完了', '「利用状況」シートを確認しました。\n（未作成だった場合はヘッダー付きで新規作成しました）', ui.ButtonSet.OK);
 }

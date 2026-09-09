@@ -82,16 +82,48 @@ function getFreeeMasterValueByName(sheetName, name, returnColIndex = 0, searchCo
  * @param {string[]} statuses 処理対象のステータス
  */
 function executeFreeeExportProcess(statuses) {
+  const startTime = Date.now();
   const ui = getSafeUi();
   const companyId = getSelectedCompanyId();
-  if (!companyId) return { error: "事業所が選択されていません。" };
+  if (!companyId) {
+    LicenseService.logUsage({
+      action: 'freee取引登録',
+      accountingSoftware: 'freee会計',
+      processedCount: 0,
+      journalCount: 0,
+      status: 'エラー',
+      errorMessage: '事業所が選択されていません。',
+      processingTimeSec: Math.round((Date.now() - startTime) / 100) / 10
+    });
+    return { error: "事業所が選択されていません。" };
+  }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('freee取引データ');
-  if (!sheet) return { error: "「freee取引データ」シートが見つかりません。" };
+  if (!sheet) {
+    LicenseService.logUsage({
+      action: 'freee取引登録',
+      accountingSoftware: 'freee会計',
+      processedCount: 0,
+      journalCount: 0,
+      status: 'エラー',
+      errorMessage: '「freee取引データ」シートが見つかりません。',
+      processingTimeSec: Math.round((Date.now() - startTime) / 100) / 10
+    });
+    return { error: "「freee取引データ」シートが見つかりません。" };
+  }
 
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) {
+    LicenseService.logUsage({
+      action: 'freee取引登録',
+      accountingSoftware: 'freee会計',
+      processedCount: 0,
+      journalCount: 0,
+      status: 'エラー',
+      errorMessage: '出力対象のデータがありません。',
+      processingTimeSec: Math.round((Date.now() - startTime) / 100) / 10
+    });
     return { error: "出力対象のデータがありません。" };
   }
 
@@ -329,6 +361,30 @@ function executeFreeeExportProcess(statuses) {
   // シートの更新 (全体を上書きすると入力規則違反の列があった場合にエラーになるため、対象の2列のみ更新する)
   const updateValues = values.map(row => [row[FREEE_COL.STATUS], row[RESULT_COL_INDEX]]);
   sheet.getRange(2, FREEE_COL.STATUS + 1, updateValues.length, 2).setValues(updateValues);
+
+  const durationSec = Math.round((Date.now() - startTime) / 100) / 10;
+  let overallStatus = "成功";
+  if (errorCount > 0 && successCount === 0) {
+    overallStatus = "エラー";
+  } else if (errorCount > 0 || attachmentErrorCount > 0) {
+    overallStatus = "警告";
+  }
+
+  let warningParts = [];
+  if (attachmentErrorCount > 0) warningParts.push(`添付失敗: ${attachmentErrorCount}件`);
+  const warningText = warningParts.join(", ");
+
+  // 利用状況ログを送信
+  LicenseService.logUsage({
+    action: 'freee取引登録',
+    accountingSoftware: 'freee会計',
+    processedCount: successCount + errorCount,
+    journalCount: successCount,
+    warningCount: warningText,
+    status: overallStatus,
+    errorMessage: errorCount > 0 ? `失敗: ${errorCount}件` : '',
+    processingTimeSec: durationSec
+  });
 
   SpreadsheetApp.getActiveSpreadsheet().toast(`登録完了 成功: ${successCount} 件, 失敗: ${errorCount} 件`, '完了', 5);
   

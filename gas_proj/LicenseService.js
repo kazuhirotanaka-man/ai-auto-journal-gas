@@ -3,6 +3,9 @@
  * （将来的にライブラリとして分離する際の主要コンポーネント）
  */
 const LicenseService = {
+  // アプリケーションバージョン
+  APP_VERSION: 'v1.0.0',
+
   // ライセンス管理APIのWeb App URL
   API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbzyAALAzum57v1BR05Gci0GL9YRyZTZqe-N332oFvB4COfXQuA-EHZjOBIomM_VE40g/exec',
   LICENSE_SHEET_NAME: 'License',
@@ -458,5 +461,63 @@ const LicenseService = {
     
     // 入力キャンセル時
     return false;
+  },
+
+  /**
+   * 利用状況ログをライセンス管理サーバーへ送信する
+   * ※ ユーザーの通常業務を止めないよう、通信エラー等が発生しても例外を投げずに処理を継続する安全設計
+   * @param {object} data
+   * @param {string} data.action アクション名（例: 'AI仕訳解析', 'CSV出力', 'freee取引登録'）
+   * @param {string} [data.accountingSoftware] 会計ソフト名（例: '弥生会計', 'freee会計'）
+   * @param {number} [data.processedCount] 処理ファイル数・件数
+   * @param {number} [data.journalCount] 生成仕訳行数・登録件数
+   * @param {string} [data.warningCount] 要確認やスキップ件数等の要約
+   * @param {string} [data.status] '成功' | '警告' | 'エラー'
+   * @param {string} [data.errorMessage] エラー時のメッセージ
+   * @param {number} [data.processingTimeSec] 所要時間（秒）
+   */
+  logUsage: function(data) {
+    try {
+      const licenseKey = this._getSavedKey();
+      if (!licenseKey) return; // ライセンスキーが未設定の場合はスキップ
+      
+      let rootId = "";
+      try {
+        rootId = this.getDriveRootId();
+      } catch (e) {}
+
+      let ssId = "";
+      try {
+        ssId = SpreadsheetApp.getActiveSpreadsheet().getId();
+      } catch (e) {}
+
+      const payload = {
+        action: 'log_usage',
+        licenseKey: licenseKey,
+        rootId: rootId,
+        spreadsheetId: ssId,
+        usageAction: data.action || '機能利用',
+        accountingSoftware: data.accountingSoftware || '',
+        processedCount: data.processedCount !== undefined && data.processedCount !== null ? data.processedCount : null,
+        journalCount: data.journalCount !== undefined && data.journalCount !== null ? data.journalCount : null,
+        warningCount: data.warningCount || '',
+        usageStatus: data.status || '成功',
+        errorMessage: data.errorMessage || '',
+        processingTimeSec: data.processingTimeSec !== undefined && data.processingTimeSec !== null ? data.processingTimeSec : null,
+        version: this.APP_VERSION
+      };
+
+      const options = {
+        method: "post",
+        payload: JSON.stringify(payload),
+        contentType: "application/json",
+        muteHttpExceptions: true
+      };
+
+      UrlFetchApp.fetch(this.API_ENDPOINT, options);
+    } catch (err) {
+      // ログ送信の失敗でユーザー業務を中断させない
+      console.warn('[LicenseService] 利用状況ログ送信スキップ/エラー: ', err.message);
+    }
   }
 };
